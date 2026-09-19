@@ -1,0 +1,506 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum UserRole {
+  ADMIN
+  STORE_USER
+  ACCOUNT_USER
+}
+
+enum POStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum PartyType {
+  SUPPLIER
+  CUSTOMER
+  BOTH
+}
+
+enum PartyStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AccountGroup {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+enum BalanceType {
+  DEBIT
+  CREDIT
+}
+
+enum TransactionType {
+  PURCHASE_WITH_PO
+  PURCHASE_WITHOUT_PO
+  SALES
+  PAYMENT
+  RECEIPT
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+}
+
+enum StockTransactionType {
+  INWARD
+  ISSUE
+  RETURN
+  ADJUSTMENT
+}
+
+enum PaymentMode {
+  CASH
+  BANK_TRANSFER
+  CHEQUE
+  UPI
+}
+
+// ==========================================
+// 1. AUTHENTICATION & MULTI-STORE TENANCY
+// ==========================================
+
+model User {
+  id           String      @id @default(uuid())
+  email        String      @unique
+  passwordHash String
+  name         String
+  role         UserRole    @default(STORE_USER)
+  phone        String?
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  storeUsers   StoreUser[]
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+model Store {
+  id          String      @id @default(uuid())
+  code        String      @unique
+  name        String
+  location    String?
+  address     String?
+  phone       String?
+  email       String?
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  storeUsers             StoreUser[]
+  purchaseOrders         PurchaseOrder[]
+  materialInwards        MaterialInward[]
+  stockTransactions      StockTransaction[]
+  accountingTransactions AccountingTransaction[]
+  expenses               Expense[]
+  income                 Income[]
+
+  @@map("stores")
+}
+
+model StoreUser {
+  id        String   @id @default(uuid())
+  userId    String
+  storeId   String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, storeId])
+  @@map("store_users")
+}
+
+// ==========================================
+// 2. STORE & INVENTORY MODULE
+// ==========================================
+
+model Item {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  name         String
+  brand        String?
+  category     String
+  unit         String   @default("PCS") // PCS, KG, LTR, MTR, BOX
+  description  String?
+  minStock     Float    @default(0)
+  maxStock     Float    @default(1000)
+  reorderLevel Float    @default(10)
+  currentStock Float    @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  poItems            PurchaseOrderItem[]
+  inwardItems        MaterialInwardItem[]
+  stockTransactions  StockTransaction[]
+
+  @@index([category])
+  @@index([name])
+  @@map("items")
+}
+
+model PurchaseOrder {
+  id               String    @id @default(uuid())
+  poNumber         String    @unique
+  poDate           DateTime  @default(now())
+  partyId          String
+  storeId          String
+  expectedDelivery DateTime?
+  status           POStatus  @default(DRAFT)
+  subtotal         Float     @default(0)
+  discount         Float     @default(0)
+  taxAmount        Float     @default(0)
+  totalAmount      Float     @default(0)
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  party                  Party                   @relation(fields: [partyId], references: [id])
+  store                  Store                   @relation(fields: [storeId], references: [id])
+  items                  PurchaseOrderItem[]
+  materialInwards        MaterialInward[]
+  accountingTransactions AccountingTransaction[]
+
+  @@index([storeId])
+  @@index([partyId])
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String  @id @default(uuid())
+  poId            String
+  itemId          String
+  quantity        Float
+  rate            Float
+  discountPercent Float   @default(0)
+  taxPercent      Float   @default(0)
+  total           Float
+  receivedQty     Float   @default(0)
+
+  purchaseOrder PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  item          Item          @relation(fields: [itemId], references: [id])
+
+  @@unique([poId, itemId])
+  @@map("purchase_order_items")
+}
+
+model MaterialInward {
+  id              String   @id @default(uuid())
+  inwardNumber    String   @unique
+  inwardDate      DateTime @default(now())
+  poId            String?  // Can be null if received directly or with non-PO reference
+  partyId         String
+  storeId         String
+  referenceNumber String?  // Supplier Challan / Delivery Order
+  remarks         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  purchaseOrder PurchaseOrder?       @relation(fields: [poId], references: [id])
+  party         Party                @relation(fields: [partyId], references: [id])
+  store         Store                @relation(fields: [storeId], references: [id])
+  items         MaterialInwardItem[]
+
+  @@index([storeId])
+  @@index([partyId])
+  @@index([poId])
+  @@map("material_inwards")
+}
+
+model MaterialInwardItem {
+  id          String  @id @default(uuid())
+  inwardId    String
+  itemId      String
+  receivedQty Float
+  rejectedQty Float   @default(0)
+  acceptedQty Float
+  rate        Float?
+  remarks     String?
+
+  materialInward MaterialInward @relation(fields: [inwardId], references: [id], onDelete: Cascade)
+  item           Item           @relation(fields: [itemId], references: [id])
+
+  @@unique([inwardId, itemId])
+  @@map("material_inward_items")
+}
+
+model StockTransaction {
+  id              String               @id @default(uuid())
+  storeId         String
+  itemId          String
+  transactionType StockTransactionType
+  quantity        Float
+  rate            Float?
+  balanceAfter    Float
+  referenceType   String               // INWARD, ISSUE, RETURN, ADJUSTMENT
+  referenceId     String?
+  notes           String?
+  createdAt       DateTime             @default(now())
+
+  store Store @relation(fields: [storeId], references: [id])
+  item  Item  @relation(fields: [itemId], references: [id])
+
+  @@index([storeId, itemId])
+  @@index([createdAt])
+  @@map("stock_transactions")
+}
+
+// ==========================================
+// 3. ACCOUNTS & FINANCIAL MODULE
+// ==========================================
+
+model Party {
+  id          String      @id @default(uuid())
+  code        String      @unique
+  name        String
+  type        PartyType   @default(SUPPLIER)
+  gstin       String?
+  pan         String?
+  email       String?
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  pincode     String?
+  creditLimit Float       @default(0)
+  creditDays  Int         @default(30)
+  status      PartyStatus @default(ACTIVE)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  purchaseOrders         PurchaseOrder[]
+  materialInwards        MaterialInward[]
+  accountingTransactions AccountingTransaction[]
+  payments               Payment[]
+  receipts               Receipt[]
+
+  @@index([type])
+  @@index([status])
+  @@map("parties")
+}
+
+model LedgerAccount {
+  id          String       @id @default(uuid())
+  code        String       @unique
+  name        String
+  group       AccountGroup
+  balanceType BalanceType  @default(DEBIT)
+  isSystem    Boolean      @default(false)
+  description String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  journalLines JournalEntryLine[]
+  payments     Payment[]
+  receipts     Receipt[]
+  expenses     Expense[]
+  income       Income[]
+
+  @@index([group])
+  @@map("ledger_accounts")
+}
+
+model JournalEntry {
+  id            String   @id @default(uuid())
+  entryNumber   String   @unique
+  entryDate     DateTime @default(now())
+  referenceType String?  // PURCHASE_INVOICE, PAYMENT, RECEIPT, MANUAL
+  referenceId   String?
+  narration     String
+  totalAmount   Float
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  lines JournalEntryLine[]
+
+  @@index([entryDate])
+  @@map("journal_entries")
+}
+
+model JournalEntryLine {
+  id             String      @id @default(uuid())
+  journalEntryId String
+  accountId      String
+  debitAmount    Float       @default(0)
+  creditAmount   Float       @default(0)
+  description    String?
+
+  journalEntry JournalEntry  @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      LedgerAccount @relation(fields: [accountId], references: [id])
+
+  @@index([journalEntryId])
+  @@index([accountId])
+  @@map("journal_entry_lines")
+}
+
+// CRITICAL ACCOUNTING RULE:
+// Purchases WITH PO must reference poId.
+// Purchases WITHOUT PO must have poId = NULL.
+model AccountingTransaction {
+  id              String          @id @default(uuid())
+  storeId         String
+  partyId         String
+  poId            String?         // NULL for WITHOUT PO direct invoices; set for WITH PO
+  transactionType TransactionType
+  invoiceNumber   String          @unique
+  invoiceDate     DateTime        @default(now())
+  dueDate         DateTime?
+  grossAmount     Float
+  taxAmount       Float           @default(0)
+  netAmount       Float
+  paidAmount      Float           @default(0)
+  paymentStatus   PaymentStatus   @default(UNPAID)
+  notes           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  store         Store          @relation(fields: [storeId], references: [id])
+  party         Party          @relation(fields: [partyId], references: [id])
+  purchaseOrder PurchaseOrder? @relation(fields: [poId], references: [id])
+  payments      Payment[]
+
+  @@index([storeId])
+  @@index([partyId])
+  @@index([poId])
+  @@index([paymentStatus])
+  @@map("accounting_transactions")
+}
+
+model Payment {
+  id            String      @id @default(uuid())
+  paymentNumber String      @unique
+  paymentDate   DateTime    @default(now())
+  partyId       String
+  accountId     String      // Bank or Cash Ledger Account
+  transactionId String?     // Link to AccountingTransaction
+  amount        Float
+  paymentMode   PaymentMode @default(BANK_TRANSFER)
+  referenceNo   String?     // Cheque No / UTR / Transaction ID
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  party       Party                  @relation(fields: [partyId], references: [id])
+  account     LedgerAccount          @relation(fields: [accountId], references: [id])
+  transaction AccountingTransaction? @relation(fields: [transactionId], references: [id])
+
+  @@index([partyId])
+  @@index([accountId])
+  @@map("payments")
+}
+
+model Receipt {
+  id            String      @id @default(uuid())
+  receiptNumber String      @unique
+  receiptDate   DateTime    @default(now())
+  partyId       String
+  accountId     String      // Bank or Cash Ledger Account
+  amount        Float
+  paymentMode   PaymentMode @default(BANK_TRANSFER)
+  referenceNo   String?
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  party   Party         @relation(fields: [partyId], references: [id])
+  account LedgerAccount @relation(fields: [accountId], references: [id])
+
+  @@index([partyId])
+  @@index([accountId])
+  @@map("receipts")
+}
+
+model Expense {
+  id            String      @id @default(uuid())
+  expenseNumber String      @unique
+  expenseDate   DateTime    @default(now())
+  storeId       String
+  accountId     String      // Expense Ledger Account
+  amount        Float
+  paymentMode   PaymentMode @default(CASH)
+  category      String
+  description   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  store   Store         @relation(fields: [storeId], references: [id])
+  account LedgerAccount @relation(fields: [accountId], references: [id])
+
+  @@index([storeId])
+  @@index([accountId])
+  @@map("expenses")
+}
+
+model Income {
+  id           String      @id @default(uuid())
+  incomeNumber String      @unique
+  incomeDate   DateTime    @default(now())
+  storeId      String
+  accountId    String      // Income Ledger Account
+  amount       Float
+  paymentMode  PaymentMode @default(BANK_TRANSFER)
+  category     String
+  description  String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  store   Store         @relation(fields: [storeId], references: [id])
+  account LedgerAccount @relation(fields: [accountId], references: [id])
+
+  @@index([storeId])
+  @@index([accountId])
+  @@map("income")
+}
+
+// ==========================================
+// 4. AUDIT TRAIL
+// ==========================================
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String   // CREATE, UPDATE, DELETE, LOGIN, LOGOUT
+  entity    String   // User, Item, PO, Inward, Payment, etc.
+  entityId  String?
+  oldValues String?  // JSON string
+  newValues String?  // JSON string
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
