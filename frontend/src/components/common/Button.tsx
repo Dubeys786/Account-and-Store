@@ -4,6 +4,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
+  loading?: boolean;
   icon?: React.ReactNode;
 }
 
@@ -12,11 +13,13 @@ export const Button: React.FC<ButtonProps> = ({
   variant = 'primary',
   size = 'md',
   isLoading = false,
+  loading = false,
   icon,
   className = '',
   disabled,
   ...props
 }) => {
+  const isSpinning = isLoading || loading;
   const baseStyles =
     'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed';
 
@@ -42,10 +45,10 @@ export const Button: React.FC<ButtonProps> = ({
   return (
     <button
       className={`${baseStyles} ${sizeStyles[size]} ${variantStyles[variant]} ${className}`}
-      disabled={disabled || isLoading}
+      disabled={disabled || isSpinning}
       {...props}
     >
-      {isLoading ? (
+      {isSpinning ? (
         <svg
           className="animate-spin h-4 w-4 text-current"
           fill="none"
