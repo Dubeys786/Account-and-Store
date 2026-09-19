@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 export class JournalService {
   /**
    * Generate sequential voucher entry number
+   */
   private static generateEntryNumber(prefix: string = 'JV'): string {
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const rand = Math.floor(1000 + Math.random() * 9000);

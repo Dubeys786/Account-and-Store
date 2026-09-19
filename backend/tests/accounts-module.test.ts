@@ -265,9 +265,6 @@ async function runAccountsTests() {
       }),
     });
     const balancedJournalJson = (await balancedJournalRes.json()) as any;
-    if (balancedJournalRes.status !== 201) {
-      console.log('balancedJournalRes error:', balancedJournalJson);
-    }
     assert(balancedJournalRes.status === 201, 'Balanced journal entry accepted with HTTP 201');
     assert(balancedJournalJson.data?.totalAmount === 5000, 'Journal entry total amount is 5,000');
     assert(balancedJournalJson.data?.lines?.length === 2, 'Two lines created in journal voucher');
@@ -583,11 +580,14 @@ async function runAccountsTests() {
     // -------------------------------------------------------------
     console.log('\nTest Suite 5: Security, Store Isolation, Party Authorization & IDOR Prevention');
 
-    // Fetch the other store (Store 2) which account user is NOT assigned to
-    const otherStore = await prisma.store.findFirst({
-      where: { id: { not: authorizedStoreId } },
+    // Create an isolated store which account user is NOT assigned to
+    const isolatedStore = await prisma.store.create({
+      data: {
+        code: `STR-ISOLATED-${Date.now().toString().slice(-4)}`,
+        name: 'South Regional Restricted Store',
+      },
     });
-    const unauthorizedStoreId = otherStore?.id;
+    const unauthorizedStoreId = isolatedStore.id;
 
     if (unauthorizedStoreId) {
       // 5.1 Non-admin trying to create party for unauthorized store -> MUST BE 403

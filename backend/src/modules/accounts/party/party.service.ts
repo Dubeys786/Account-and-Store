@@ -93,42 +93,46 @@ export class PartyService {
     const limit = Math.max(1, Math.min(100, filters.limit || 20));
     const skip = (page - 1) * limit;
 
-    const where: Prisma.PartyWhereInput = {};
+    const andConditions: Prisma.PartyWhereInput[] = [];
 
     // Search filter
     if (filters.search && filters.search.trim()) {
       const s = filters.search.trim();
-      where.OR = [
-        { name: { contains: s, mode: 'insensitive' } },
-        { code: { contains: s, mode: 'insensitive' } },
-        { gstin: { contains: s, mode: 'insensitive' } },
-        { pan: { contains: s, mode: 'insensitive' } },
-        { mobile: { contains: s, mode: 'insensitive' } },
-        { phone: { contains: s, mode: 'insensitive' } },
-      ];
+      andConditions.push({
+        OR: [
+          { name: { contains: s, mode: 'insensitive' } },
+          { code: { contains: s, mode: 'insensitive' } },
+          { gstin: { contains: s, mode: 'insensitive' } },
+          { pan: { contains: s, mode: 'insensitive' } },
+          { mobile: { contains: s, mode: 'insensitive' } },
+          { phone: { contains: s, mode: 'insensitive' } },
+        ],
+      });
     }
 
     // Type filter
     if (filters.type && filters.type !== 'ALL') {
-      where.type = filters.type as PartyType;
+      andConditions.push({ type: filters.type as PartyType });
     }
 
     // Status filter
     if (filters.status && filters.status !== 'ALL') {
-      where.status = filters.status as PartyStatus;
+      andConditions.push({ status: filters.status as PartyStatus });
     }
 
     // Store filter & tenancy isolation
     if (filters.storeId) {
-      where.storeId = filters.storeId;
+      andConditions.push({ storeId: filters.storeId });
     } else if (!isAdmin && authorizedStoreIds && authorizedStoreIds.length > 0) {
-      // Non-admin sees global parties (storeId: null) + parties for their assigned stores
-      where.OR = [
-        ...(where.OR || []),
-        { storeId: null },
-        { storeId: { in: authorizedStoreIds } },
-      ];
+      andConditions.push({
+        OR: [
+          { storeId: null },
+          { storeId: { in: authorizedStoreIds } },
+        ],
+      });
     }
+
+    const where: Prisma.PartyWhereInput = andConditions.length > 0 ? { AND: andConditions } : {};
 
     // Sorting
     const sortBy = filters.sortBy || 'name';
