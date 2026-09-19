@@ -5,16 +5,11 @@ import { Prisma } from '@prisma/client';
 export class JournalService {
   /**
    * Generate sequential voucher entry number
-   */
-  private static async generateEntryNumber(prefix: string = 'JV'): Promise<string> {
+  private static generateEntryNumber(prefix: string = 'JV'): string {
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const count = await prisma.journalEntry.count({
-      where: {
-        entryNumber: { startsWith: `${prefix}-${today}` },
-      },
-    });
-    const seq = (count + 1).toString().padStart(4, '0');
-    return `${prefix}-${today}-${seq}`;
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    const time = Date.now().toString().slice(-4);
+    return `${prefix}-${today}-${time}${rand}`;
   }
 
   /**
@@ -147,7 +142,7 @@ export class JournalService {
         }
       }
 
-      const entryNumber = input.entryNumber || (await this.generateEntryNumber());
+      const entryNumber = input.entryNumber || this.generateEntryNumber();
 
       // Create header and lines atomically
       const entry = await tx.journalEntry.create({
@@ -184,9 +179,12 @@ export class JournalService {
     if (customTx) {
       return executeWithTx(customTx);
     } else {
-      return prisma.$transaction(async (tx) => {
-        return executeWithTx(tx);
-      });
+      return prisma.$transaction(
+        async (tx) => {
+          return executeWithTx(tx);
+        },
+        { maxWait: 10000, timeout: 15000 }
+      );
     }
   }
 

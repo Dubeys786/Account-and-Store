@@ -265,6 +265,9 @@ async function runAccountsTests() {
       }),
     });
     const balancedJournalJson = (await balancedJournalRes.json()) as any;
+    if (balancedJournalRes.status !== 201) {
+      console.log('balancedJournalRes error:', balancedJournalJson);
+    }
     assert(balancedJournalRes.status === 201, 'Balanced journal entry accepted with HTTP 201');
     assert(balancedJournalJson.data?.totalAmount === 5000, 'Journal entry total amount is 5,000');
     assert(balancedJournalJson.data?.lines?.length === 2, 'Two lines created in journal voucher');
@@ -326,6 +329,9 @@ async function runAccountsTests() {
         }),
       });
       const withPoJson = (await withPoRes.json()) as any;
+      if (withPoRes.status !== 201) {
+        console.log('withPoRes error:', withPoJson);
+      }
       assert(withPoRes.status === 201, 'WITH PO transaction created successfully (HTTP 201)');
       assert(withPoJson.data?.poId === existingPo.id, 'Transaction poId matches actual PO ID');
       assert(withPoJson.data?.netAmount === 11800, 'Net amount is gross + tax (11,800)');

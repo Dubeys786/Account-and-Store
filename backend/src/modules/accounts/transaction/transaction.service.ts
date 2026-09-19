@@ -66,14 +66,12 @@ export class TransactionService {
   /**
    * Generate sequential invoice/transaction number
    */
-  private static async generateInvoiceNumber(type: TransactionType): Promise<string> {
+  private static generateInvoiceNumber(type: TransactionType): string {
     const prefix = type.substring(0, 3).toUpperCase();
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const count = await prisma.accountingTransaction.count({
-      where: { invoiceNumber: { startsWith: `TXN-${prefix}-${today}` } },
-    });
-    const seq = (count + 1).toString().padStart(4, '0');
-    return `TXN-${prefix}-${today}-${seq}`;
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    const time = Date.now().toString().slice(-4);
+    return `TXN-${prefix}-${today}-${time}${rand}`;
   }
 
   /**
@@ -157,7 +155,7 @@ export class TransactionService {
 
     let invoiceNumber = data.invoiceNumber?.trim();
     if (!invoiceNumber) {
-      invoiceNumber = await this.generateInvoiceNumber(transactionType);
+      invoiceNumber = this.generateInvoiceNumber(transactionType);
     }
 
     const existingInv = await prisma.accountingTransaction.findUnique({
@@ -477,7 +475,7 @@ export class TransactionService {
       });
 
       return transaction;
-    });
+    }, { maxWait: 10000, timeout: 15000 });
   }
 
   /**
