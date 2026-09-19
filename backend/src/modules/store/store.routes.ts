@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { UserRole } from '@prisma/client';
+import prisma from '../../config/db';
 import { authenticate } from '../../middleware/auth.middleware';
 import { requireRoles } from '../../middleware/role.middleware';
 import { ItemController } from './item/item.controller';
@@ -13,6 +14,33 @@ const router = Router();
 
 // Store modules are strictly accessible by ADMIN and STORE_USER only. ACCOUNT_USER is forbidden.
 router.use(authenticate, requireRoles([UserRole.ADMIN, UserRole.STORE_USER]));
+
+// Lookup endpoints for forms
+router.get('/stores', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const stores = await prisma.store.findMany({
+      where: { isActive: true },
+      orderBy: { name: 'asc' },
+    });
+    res.json({ success: true, data: stores });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/suppliers', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const suppliers = await prisma.party.findMany({
+      where: {
+        type: { in: ['SUPPLIER', 'BOTH'] },
+      },
+      orderBy: { name: 'asc' },
+    });
+    res.json({ success: true, data: suppliers });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ==========================================
 // 1. DASHBOARD METRICS
