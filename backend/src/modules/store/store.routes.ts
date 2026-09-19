@@ -1,150 +1,109 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { UserRole } from '@prisma/client';
 import { authenticate } from '../../middleware/auth.middleware';
 import { requireRoles } from '../../middleware/role.middleware';
-import prisma from '../../config/db';
+import { ItemController } from './item/item.controller';
+import { POController } from './po/po.controller';
+import { InwardController } from './inward/inward.controller';
+import { StockController } from './stock/stock.controller';
+import { StoreDashboardService } from './dashboard/dashboard.service';
+import { StoreReportsService } from './reports/reports.service';
 
 const router = Router();
 
-// Store modules are accessible by ADMIN and STORE_USER only. ACCOUNT_USER is forbidden.
+// Store modules are strictly accessible by ADMIN and STORE_USER only. ACCOUNT_USER is forbidden.
 router.use(authenticate, requireRoles([UserRole.ADMIN, UserRole.STORE_USER]));
 
-// Store Dashboard Metrics
-router.get('/dashboard-metrics', async (_req: Request, res: Response) => {
+// ==========================================
+// 1. DASHBOARD METRICS
+// ==========================================
+router.get('/dashboard-metrics', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const [totalItems, totalPOs, totalInwards, lowStockCount] = await Promise.all([
-      prisma.item.count(),
-      prisma.purchaseOrder.count(),
-      prisma.materialInward.count(),
-      prisma.item.count({ where: { currentStock: { lte: 10 } } }),
-    ]);
-
+    const storeId = req.activeStoreId || (req.query.storeId as string);
+    const data = await StoreDashboardService.getDashboardMetrics(storeId);
     res.json({
       success: true,
       message: 'Store dashboard metrics retrieved.',
-      data: {
-        totalItems,
-        totalPOs,
-        totalInwards,
-        lowStockCount,
-        availableStockUnits: 515,
-      },
+      data,
     });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+  } catch (error) {
+    next(error);
   }
 });
 
-// Item Master
-router.get('/items', async (_req: Request, res: Response) => {
+// ==========================================
+// 2. ITEM MASTER CRUD
+// ==========================================
+router.get('/items', ItemController.getItems);
+router.get('/items/:id', ItemController.getItemById);
+router.post('/items', ItemController.createItem);
+router.put('/items/:id', ItemController.updateItem);
+router.patch('/items/:id/status', ItemController.toggleStatus);
+router.delete('/items/:id', ItemController.deleteItem);
+
+// ==========================================
+// 3. PURCHASE ORDER (PO MASTER)
+// ==========================================
+router.get('/purchase-orders', POController.getPurchaseOrders);
+router.get('/purchase-orders/:id', POController.getPOById);
+router.post('/purchase-orders', POController.createPurchaseOrder);
+router.patch('/purchase-orders/:id/status', POController.updateStatus);
+
+// ==========================================
+// 4. MATERIAL INWARD
+// ==========================================
+router.get('/material-inwards', InwardController.getMaterialInwards);
+router.get('/material-inwards/:id', InwardController.getInwardById);
+router.post('/material-inwards', InwardController.createMaterialInward);
+
+// ==========================================
+// 5. STOCK REGISTER & TRANSACTIONS (ISSUE / RETURN)
+// ==========================================
+router.get('/stock-register', StockController.getStockRegister);
+router.post('/stock/issue', StockController.issueStock);
+router.post('/stock/return', StockController.returnStock);
+router.get('/stock/transactions', StockController.getTransactions);
+
+// Backward compatible alias
+router.get('/issue-return', StockController.getTransactions);
+
+// ==========================================
+// 6. STORE REPORTS
+// ==========================================
+router.get('/reports/valuation', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const items = await prisma.item.findMany({
-      take: 20,
-      orderBy: { code: 'asc' },
-    });
-    res.json({
-      success: true,
-      message: 'Items list retrieved.',
-      data: items,
-    });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    const data = await StoreReportsService.getStockValuation();
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
   }
 });
 
-// PO Master
-router.get('/purchase-orders', async (_req: Request, res: Response) => {
+router.get('/reports/consumption', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const pos = await prisma.purchaseOrder.findMany({
-      take: 20,
-      include: { party: true, store: true, items: true },
-      orderBy: { poDate: 'desc' },
-    });
-    res.json({
-      success: true,
-      message: 'Purchase Orders retrieved.',
-      data: pos,
-    });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    const data = await StoreReportsService.getItemConsumption();
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
   }
 });
 
-// Material Inward
-router.get('/material-inwards', async (_req: Request, res: Response) => {
+router.get('/reports/pending-pos', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const inwards = await prisma.materialInward.findMany({
-      take: 20,
-      include: { party: true, purchaseOrder: true, items: true },
-      orderBy: { inwardDate: 'desc' },
-    });
-    res.json({
-      success: true,
-      message: 'Material Inwards retrieved.',
-      data: inwards,
-    });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    const data = await StoreReportsService.getPendingPOs();
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
   }
 });
 
-// Stock Register
-router.get('/stock-register', async (_req: Request, res: Response) => {
+router.get('/reports/supplier-rejection', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const items = await prisma.item.findMany({
-      select: {
-        id: true,
-        code: true,
-        name: true,
-        category: true,
-        unit: true,
-        currentStock: true,
-        minStock: true,
-        reorderLevel: true,
-      },
-    });
-    res.json({
-      success: true,
-      message: 'Stock Register retrieved.',
-      data: items,
-    });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    const data = await StoreReportsService.getSupplierRejectionReport();
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
   }
-});
-
-// Issue / Return
-router.get('/issue-return', async (_req: Request, res: Response) => {
-  try {
-    const transactions = await prisma.stockTransaction.findMany({
-      take: 20,
-      include: { item: true, store: true },
-      orderBy: { createdAt: 'desc' },
-    });
-    res.json({
-      success: true,
-      message: 'Stock Issue / Return transactions retrieved.',
-      data: transactions,
-    });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// Reports
-router.get('/reports', async (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    message: 'Store reports module placeholder ready.',
-    data: {
-      availableReports: [
-        'Stock Valuation Summary',
-        'Item Consumption Analysis',
-        'Pending PO Aging Report',
-        'Supplier Inward Rejection Rate',
-      ],
-    },
-  });
 });
 
 export default router;

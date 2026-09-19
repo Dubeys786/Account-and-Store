@@ -1,0 +1,30 @@
+{
+  "name": "prozen-store-and-accounts",
+  "version": "1.0.0",
+  "description": "PROZEN - Store & Accounts Management Enterprise Full-Stack Web Application",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"cyan,blue\" \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "test": "npm --prefix backend test",
+    "db:migrate": "npm --prefix backend run db:migrate",
+    "db:seed": "npm --prefix backend run db:seed"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "keywords": [
+    "inventory",
+    "accounting",
+    "store",
+    "enterprise",
+    "full-stack",
+    "react",
+    "express",
+    "typescript",
+    "postgresql",
+    "prisma"
+  ],
+  "author": "PROZEN",
+  "license": "UNLICENSED"
+}
