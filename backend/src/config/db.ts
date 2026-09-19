@@ -128,6 +128,32 @@ export async function initDatabase(): Promise<void> {
     } else {
       console.log('✅ PostgreSQL database schema verified (tables present)');
     }
+
+    // Check if Phase 3 columns exist
+    const partyColRes = await pglite.query<{ count: string }>(
+      "SELECT count(*) FROM information_schema.columns WHERE table_name = 'parties' AND column_name = 'mobile'"
+    );
+    const partyMobileColCount = parseInt(partyColRes.rows[0]?.count || '0', 10);
+
+    if (partyMobileColCount === 0) {
+      console.log('📦 Executing Phase 3 accounts migration into storage engine...');
+      const phase3Candidates = [
+        path.resolve(__dirname, '../../prisma/migrations/20260919010000_phase3_accounts/migration.sql'),
+        path.resolve(process.cwd(), 'prisma/migrations/20260919010000_phase3_accounts/migration.sql'),
+      ];
+      const phase3File = phase3Candidates.find((p) => fs.existsSync(p));
+
+      if (phase3File) {
+        let ddl = fs.readFileSync(phase3File, 'utf-8');
+        if (ddl.charCodeAt(0) === 0xfeff) {
+          ddl = ddl.slice(1);
+        }
+        await pglite.exec(ddl);
+        console.log('✅ Phase 3 accounts migration applied successfully!');
+      } else {
+        console.warn('⚠️  Could not locate Phase 3 migration.sql file');
+      }
+    }
   } catch (err: any) {
     console.error('❌ Database bootstrap error:', err.message || err);
     throw err;

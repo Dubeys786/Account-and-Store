@@ -1,11 +1,11 @@
 -- CreateEnum
 CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'STORE_USER', 'ACCOUNT_USER');
 CREATE TYPE "POStatus" AS ENUM ('DRAFT', 'PENDING', 'APPROVED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CANCELLED');
-CREATE TYPE "PartyType" AS ENUM ('SUPPLIER', 'CUSTOMER', 'BOTH');
+CREATE TYPE "PartyType" AS ENUM ('SUPPLIER', 'CUSTOMER', 'DEALER', 'DISTRIBUTOR', 'OTHER', 'BOTH');
 CREATE TYPE "PartyStatus" AS ENUM ('ACTIVE', 'INACTIVE');
 CREATE TYPE "AccountGroup" AS ENUM ('ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE');
 CREATE TYPE "BalanceType" AS ENUM ('DEBIT', 'CREDIT');
-CREATE TYPE "TransactionType" AS ENUM ('PURCHASE_WITH_PO', 'PURCHASE_WITHOUT_PO', 'SALES', 'PAYMENT', 'RECEIPT');
+CREATE TYPE "TransactionType" AS ENUM ('PURCHASE', 'PURCHASE_RETURN', 'SALE', 'SALE_RETURN', 'PAYMENT', 'RECEIPT', 'EXPENSE', 'INCOME', 'OPENING_BALANCE', 'ADJUSTMENT', 'PURCHASE_WITH_PO', 'PURCHASE_WITHOUT_PO', 'SALES');
 CREATE TYPE "PaymentStatus" AS ENUM ('UNPAID', 'PARTIALLY_PAID', 'PAID');
 CREATE TYPE "StockTransactionType" AS ENUM ('INWARD', 'ISSUE', 'RETURN', 'ADJUSTMENT');
 CREATE TYPE "PaymentMode" AS ENUM ('CASH', 'BANK_TRANSFER', 'CHEQUE', 'UPI');
@@ -152,17 +152,24 @@ CREATE TABLE "parties" (
     "code" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "type" "PartyType" NOT NULL DEFAULT 'SUPPLIER',
-    "gstin" TEXT,
-    "pan" TEXT,
+    "mobile" TEXT,
+    "alternateMobile" TEXT,
     "email" TEXT,
     "phone" TEXT,
+    "gstin" TEXT,
+    "pan" TEXT,
     "address" TEXT,
     "city" TEXT,
     "state" TEXT,
     "pincode" TEXT,
+    "openingBalance" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "openingBalanceType" "BalanceType" NOT NULL DEFAULT 'DEBIT',
     "creditLimit" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "creditDays" INTEGER NOT NULL DEFAULT 30,
+    "paymentTerms" TEXT DEFAULT '30 Days',
+    "storeId" TEXT,
     "status" "PartyStatus" NOT NULL DEFAULT 'ACTIVE',
+    "notes" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "parties_pkey" PRIMARY KEY ("id")
@@ -201,6 +208,7 @@ CREATE TABLE "journal_entry_lines" (
     "id" TEXT NOT NULL,
     "journalEntryId" TEXT NOT NULL,
     "accountId" TEXT NOT NULL,
+    "partyId" TEXT,
     "debitAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "creditAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "description" TEXT,
@@ -223,6 +231,7 @@ CREATE TABLE "accounting_transactions" (
     "paidAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "paymentStatus" "PaymentStatus" NOT NULL DEFAULT 'UNPAID',
     "notes" TEXT,
+    "journalEntryId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "accounting_transactions_pkey" PRIMARY KEY ("id")
@@ -330,12 +339,14 @@ CREATE INDEX "stock_transactions_createdAt_idx" ON "stock_transactions"("created
 CREATE UNIQUE INDEX "parties_code_key" ON "parties"("code");
 CREATE INDEX "parties_type_idx" ON "parties"("type");
 CREATE INDEX "parties_status_idx" ON "parties"("status");
+CREATE INDEX "parties_storeId_idx" ON "parties"("storeId");
 CREATE UNIQUE INDEX "ledger_accounts_code_key" ON "ledger_accounts"("code");
 CREATE INDEX "ledger_accounts_group_idx" ON "ledger_accounts"("group");
 CREATE UNIQUE INDEX "journal_entries_entryNumber_key" ON "journal_entries"("entryNumber");
 CREATE INDEX "journal_entries_entryDate_idx" ON "journal_entries"("entryDate");
 CREATE INDEX "journal_entry_lines_journalEntryId_idx" ON "journal_entry_lines"("journalEntryId");
 CREATE INDEX "journal_entry_lines_accountId_idx" ON "journal_entry_lines"("accountId");
+CREATE INDEX "journal_entry_lines_partyId_idx" ON "journal_entry_lines"("partyId");
 CREATE UNIQUE INDEX "accounting_transactions_invoiceNumber_key" ON "accounting_transactions"("invoiceNumber");
 CREATE INDEX "accounting_transactions_storeId_idx" ON "accounting_transactions"("storeId");
 CREATE INDEX "accounting_transactions_partyId_idx" ON "accounting_transactions"("partyId");
@@ -360,6 +371,7 @@ CREATE INDEX "audit_logs_createdAt_idx" ON "audit_logs"("createdAt");
 -- AddForeignKey
 ALTER TABLE "store_users" ADD CONSTRAINT "store_users_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "store_users" ADD CONSTRAINT "store_users_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "parties" ADD CONSTRAINT "parties_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "stores"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_partyId_fkey" FOREIGN KEY ("partyId") REFERENCES "parties"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "stores"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "purchase_order_items" ADD CONSTRAINT "purchase_order_items_poId_fkey" FOREIGN KEY ("poId") REFERENCES "purchase_orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -373,9 +385,11 @@ ALTER TABLE "stock_transactions" ADD CONSTRAINT "stock_transactions_storeId_fkey
 ALTER TABLE "stock_transactions" ADD CONSTRAINT "stock_transactions_itemId_fkey" FOREIGN KEY ("itemId") REFERENCES "items"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "journal_entry_lines" ADD CONSTRAINT "journal_entry_lines_journalEntryId_fkey" FOREIGN KEY ("journalEntryId") REFERENCES "journal_entries"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "journal_entry_lines" ADD CONSTRAINT "journal_entry_lines_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "ledger_accounts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "journal_entry_lines" ADD CONSTRAINT "journal_entry_lines_partyId_fkey" FOREIGN KEY ("partyId") REFERENCES "parties"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "accounting_transactions" ADD CONSTRAINT "accounting_transactions_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "stores"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "accounting_transactions" ADD CONSTRAINT "accounting_transactions_partyId_fkey" FOREIGN KEY ("partyId") REFERENCES "parties"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "accounting_transactions" ADD CONSTRAINT "accounting_transactions_poId_fkey" FOREIGN KEY ("poId") REFERENCES "purchase_orders"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "accounting_transactions" ADD CONSTRAINT "accounting_transactions_journalEntryId_fkey" FOREIGN KEY ("journalEntryId") REFERENCES "journal_entries"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "payments" ADD CONSTRAINT "payments_partyId_fkey" FOREIGN KEY ("partyId") REFERENCES "parties"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "payments" ADD CONSTRAINT "payments_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "ledger_accounts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "payments" ADD CONSTRAINT "payments_transactionId_fkey" FOREIGN KEY ("transactionId") REFERENCES "accounting_transactions"("id") ON DELETE SET NULL ON UPDATE CASCADE;

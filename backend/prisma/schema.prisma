@@ -30,6 +30,9 @@ enum POStatus {
 enum PartyType {
   SUPPLIER
   CUSTOMER
+  DEALER
+  DISTRIBUTOR
+  OTHER
   BOTH
 }
 
@@ -52,11 +55,19 @@ enum BalanceType {
 }
 
 enum TransactionType {
+  PURCHASE
+  PURCHASE_RETURN
+  SALE
+  SALE_RETURN
+  PAYMENT
+  RECEIPT
+  EXPENSE
+  INCOME
+  OPENING_BALANCE
+  ADJUSTMENT
   PURCHASE_WITH_PO
   PURCHASE_WITHOUT_PO
   SALES
-  PAYMENT
-  RECEIPT
 }
 
 enum PaymentStatus {
@@ -119,6 +130,7 @@ model Store {
   accountingTransactions AccountingTransaction[]
   expenses               Expense[]
   income                 Income[]
+  parties                Party[]
 
   @@map("stores")
 }
@@ -279,32 +291,42 @@ model StockTransaction {
 // ==========================================
 
 model Party {
-  id          String      @id @default(uuid())
-  code        String      @unique
-  name        String
-  type        PartyType   @default(SUPPLIER)
-  gstin       String?
-  pan         String?
-  email       String?
-  phone       String?
-  address     String?
-  city        String?
-  state       String?
-  pincode     String?
-  creditLimit Float       @default(0)
-  creditDays  Int         @default(30)
-  status      PartyStatus @default(ACTIVE)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id                 String      @id @default(uuid())
+  code               String      @unique
+  name               String
+  type               PartyType   @default(SUPPLIER)
+  mobile             String?
+  alternateMobile    String?
+  email              String?
+  phone              String?
+  gstin              String?
+  pan                String?
+  address            String?
+  city               String?
+  state              String?
+  pincode            String?
+  openingBalance     Float       @default(0)
+  openingBalanceType BalanceType @default(DEBIT)
+  creditLimit        Float       @default(0)
+  creditDays         Int         @default(30)
+  paymentTerms       String?     @default("30 Days")
+  storeId            String?
+  status             PartyStatus @default(ACTIVE)
+  notes              String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
 
+  store                  Store?                  @relation(fields: [storeId], references: [id])
   purchaseOrders         PurchaseOrder[]
   materialInwards        MaterialInward[]
   accountingTransactions AccountingTransaction[]
   payments               Payment[]
   receipts               Receipt[]
+  journalLines           JournalEntryLine[]
 
   @@index([type])
   @@index([status])
+  @@index([storeId])
   @@map("parties")
 }
 
@@ -333,14 +355,15 @@ model JournalEntry {
   id            String   @id @default(uuid())
   entryNumber   String   @unique
   entryDate     DateTime @default(now())
-  referenceType String?  // PURCHASE_INVOICE, PAYMENT, RECEIPT, MANUAL
+  referenceType String?  // PURCHASE, SALE, PAYMENT, RECEIPT, EXPENSE, INCOME, OPENING_BALANCE, ADJUSTMENT, MANUAL
   referenceId   String?
   narration     String
   totalAmount   Float
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  lines JournalEntryLine[]
+  lines                  JournalEntryLine[]
+  accountingTransactions AccountingTransaction[]
 
   @@index([entryDate])
   @@map("journal_entries")
@@ -350,15 +373,18 @@ model JournalEntryLine {
   id             String      @id @default(uuid())
   journalEntryId String
   accountId      String
+  partyId        String?
   debitAmount    Float       @default(0)
   creditAmount   Float       @default(0)
   description    String?
 
   journalEntry JournalEntry  @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
   account      LedgerAccount @relation(fields: [accountId], references: [id])
+  party        Party?        @relation(fields: [partyId], references: [id])
 
   @@index([journalEntryId])
   @@index([accountId])
+  @@index([partyId])
   @@map("journal_entry_lines")
 }
 
@@ -380,12 +406,14 @@ model AccountingTransaction {
   paidAmount      Float           @default(0)
   paymentStatus   PaymentStatus   @default(UNPAID)
   notes           String?
+  journalEntryId  String?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
   store         Store          @relation(fields: [storeId], references: [id])
   party         Party          @relation(fields: [partyId], references: [id])
   purchaseOrder PurchaseOrder? @relation(fields: [poId], references: [id])
+  journalEntry  JournalEntry?  @relation(fields: [journalEntryId], references: [id])
   payments      Payment[]
 
   @@index([storeId])

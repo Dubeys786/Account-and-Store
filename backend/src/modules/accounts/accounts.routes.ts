@@ -4,13 +4,20 @@ import { authenticate } from '../../middleware/auth.middleware';
 import { requireRoles } from '../../middleware/role.middleware';
 import prisma from '../../config/db';
 
+import { PartyController } from './party/party.controller';
+import { JournalController } from './foundation/journal.controller';
+import { TransactionController } from './transaction/transaction.controller';
+import { LedgerController } from './ledger/ledger.controller';
+
 const router = Router();
 
 // Accounts modules are strictly accessible by ADMIN and ACCOUNT_USER only.
 // STORE_USER is strictly FORBIDDEN to access these routes!
 router.use(authenticate, requireRoles([UserRole.ADMIN, UserRole.ACCOUNT_USER]));
 
-// Accounts Dashboard Metrics
+// ==========================================
+// 1. DASHBOARD & METRICS
+// ==========================================
 router.get('/dashboard-metrics', async (_req: Request, res: Response) => {
   try {
     const [partyCount, accountCount, poCount] = await Promise.all([
@@ -37,22 +44,39 @@ router.get('/dashboard-metrics', async (_req: Request, res: Response) => {
   }
 });
 
-// Party Master
-router.get('/parties', async (_req: Request, res: Response) => {
-  try {
-    const parties = await prisma.party.findMany({
-      take: 20,
-      orderBy: { name: 'asc' },
-    });
-    res.json({
-      success: true,
-      message: 'Parties list retrieved.',
-      data: parties,
-    });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
+// ==========================================
+// 2. PARTY MASTER (CRUD, Search, Filter, Pagination, Deactivate)
+// ==========================================
+router.post('/parties', PartyController.createParty);
+router.get('/parties', PartyController.getParties);
+router.get('/parties/:id', PartyController.getPartyById);
+router.put('/parties/:id', PartyController.updateParty);
+router.patch('/parties/:id/deactivate', PartyController.deactivateParty);
+router.patch('/parties/:id/status', PartyController.toggleStatus);
+
+// ==========================================
+// 3. PARTY LEDGER FOUNDATION (Ledger Statement, Balance, Transactions)
+// ==========================================
+router.get('/parties/:id/ledger', LedgerController.getPartyLedger);
+router.get('/parties/:id/balance', LedgerController.getPartyBalance);
+router.get('/parties/:id/transactions', LedgerController.getPartyTransactions);
+router.get('/ledger', LedgerController.getGenericLedger);
+
+// ==========================================
+// 4. ACCOUNTING FOUNDATION (Journal Entries, Double-Entry Balancing, Chart of Accounts)
+// ==========================================
+router.post('/journal-entries', JournalController.createJournalEntry);
+router.get('/journal-entries', JournalController.getJournalEntries);
+router.get('/journal-entries/:id', JournalController.getJournalEntryById);
+router.get('/ledger-accounts', JournalController.getLedgerAccounts);
+router.post('/ledger-accounts', JournalController.createLedgerAccount);
+
+// ==========================================
+// 5. ACCOUNTING TRANSACTIONS (Purchase, Return, Sale, Payment, Receipt, Expense, Income, etc.)
+// ==========================================
+router.post('/transactions', TransactionController.createTransaction);
+router.get('/transactions', TransactionController.getTransactions);
+router.get('/transactions/:id', TransactionController.getTransactionById);
 
 // Purchase Accounts (Supports WITH PO and WITHOUT PO)
 router.get('/purchases', async (req: Request, res: Response) => {
@@ -84,46 +108,50 @@ router.get('/purchases', async (req: Request, res: Response) => {
   }
 });
 
-// Party Ledger
-router.get('/ledger', async (req: Request, res: Response) => {
-  const partyId = req.query.partyId as string;
-  res.json({
-    success: true,
-    message: 'Party Ledger entries retrieved.',
-    data: {
-      partyId: partyId || null,
-      openingBalance: 0,
-      closingBalance: 0,
-      entries: [],
-    },
-  });
-});
-
-// Receivables
+// ==========================================
+// 6. RECEIVABLES & PAYABLES
+// ==========================================
 router.get('/receivables', async (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    message: 'Receivables aging and party list retrieved.',
-    data: {
-      totalReceivables: 450000,
-      records: [],
-    },
-  });
+  try {
+    const customers = await prisma.party.findMany({
+      where: { type: { in: ['CUSTOMER', 'DEALER', 'DISTRIBUTOR'] }, status: 'ACTIVE' },
+      take: 20,
+    });
+    res.json({
+      success: true,
+      message: 'Receivables aging and party list retrieved.',
+      data: {
+        totalReceivables: 450000,
+        records: customers,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
-// Payables
 router.get('/payables', async (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    message: 'Payables aging and supplier list retrieved.',
-    data: {
-      totalPayables: 285000,
-      records: [],
-    },
-  });
+  try {
+    const suppliers = await prisma.party.findMany({
+      where: { type: 'SUPPLIER', status: 'ACTIVE' },
+      take: 20,
+    });
+    res.json({
+      success: true,
+      message: 'Payables aging and supplier list retrieved.',
+      data: {
+        totalPayables: 285000,
+        records: suppliers,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
-// Payments
+// ==========================================
+// 7. PAYMENTS & RECEIPTS
+// ==========================================
 router.get('/payments', async (_req: Request, res: Response) => {
   try {
     const payments = await prisma.payment.findMany({
@@ -137,7 +165,6 @@ router.get('/payments', async (_req: Request, res: Response) => {
   }
 });
 
-// Receipts
 router.get('/receipts', async (_req: Request, res: Response) => {
   try {
     const receipts = await prisma.receipt.findMany({
@@ -151,7 +178,9 @@ router.get('/receipts', async (_req: Request, res: Response) => {
   }
 });
 
-// Expenses
+// ==========================================
+// 8. EXPENSES & INCOME
+// ==========================================
 router.get('/expenses', async (_req: Request, res: Response) => {
   try {
     const expenses = await prisma.expense.findMany({
@@ -165,7 +194,6 @@ router.get('/expenses', async (_req: Request, res: Response) => {
   }
 });
 
-// Income
 router.get('/income', async (_req: Request, res: Response) => {
   try {
     const income = await prisma.income.findMany({
@@ -179,34 +207,75 @@ router.get('/income', async (_req: Request, res: Response) => {
   }
 });
 
-// Day Book
+// ==========================================
+// 9. DAY BOOK, CASH BOOK, BANK BOOK
+// ==========================================
 router.get('/day-book', async (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    message: 'Day Book transactions retrieved.',
-    data: { date: new Date().toISOString().split('T')[0], transactions: [] },
-  });
+  try {
+    const transactions = await prisma.journalEntry.findMany({
+      take: 20,
+      orderBy: { entryDate: 'desc' },
+      include: {
+        lines: { include: { account: true, party: true } },
+      },
+    });
+    res.json({
+      success: true,
+      message: 'Day Book transactions retrieved.',
+      data: { date: new Date().toISOString().split('T')[0], transactions },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
-// Cash Book
 router.get('/cash-book', async (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    message: 'Cash Book ledger entries retrieved.',
-    data: { cashAccountCode: '1010', balance: 54200, entries: [] },
-  });
+  try {
+    const cashAccount = await prisma.ledgerAccount.findUnique({
+      where: { code: '1010' },
+    });
+    const lines = cashAccount
+      ? await prisma.journalEntryLine.findMany({
+          where: { accountId: cashAccount.id },
+          include: { journalEntry: true, party: true },
+          take: 20,
+        })
+      : [];
+    res.json({
+      success: true,
+      message: 'Cash Book ledger entries retrieved.',
+      data: { cashAccountCode: '1010', balance: 54200, entries: lines },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
-// Bank Book
 router.get('/bank-book', async (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    message: 'Bank Book ledger entries retrieved.',
-    data: { bankAccountCode: '1020', balance: 1190800, entries: [] },
-  });
+  try {
+    const bankAccount = await prisma.ledgerAccount.findUnique({
+      where: { code: '1020' },
+    });
+    const lines = bankAccount
+      ? await prisma.journalEntryLine.findMany({
+          where: { accountId: bankAccount.id },
+          include: { journalEntry: true, party: true },
+          take: 20,
+        })
+      : [];
+    res.json({
+      success: true,
+      message: 'Bank Book ledger entries retrieved.',
+      data: { bankAccountCode: '1020', balance: 1190800, entries: lines },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
-// Accounting Reports
+// ==========================================
+// 10. ACCOUNTING REPORTS & SETTINGS
+// ==========================================
 router.get('/reports', async (_req: Request, res: Response) => {
   res.json({
     success: true,
@@ -223,7 +292,6 @@ router.get('/reports', async (_req: Request, res: Response) => {
   });
 });
 
-// Account Settings
 router.get('/settings', async (_req: Request, res: Response) => {
   res.json({
     success: true,
