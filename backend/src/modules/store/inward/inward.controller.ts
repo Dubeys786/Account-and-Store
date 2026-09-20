@@ -8,8 +8,7 @@ export class InwardController {
   static async getMaterialInwards(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const user = req.user!;
-      const { storeId, poId } = req.query;
-
+      const { storeId, poId, search } = req.query;
       const requestedStoreId = storeId as string;
       let storeIdsFilter: string[] | undefined = undefined;
 
@@ -31,6 +30,7 @@ export class InwardController {
         storeId: requestedStoreId,
         storeIds: storeIdsFilter,
         poId: poId as string,
+        search: search as string,
       });
 
       res.status(200).json({

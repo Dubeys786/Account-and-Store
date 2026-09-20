@@ -4,8 +4,8 @@ export async function apiRequest<T = any>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<{ success: boolean; data?: T; message?: string; error?: any; meta?: any; summary?: any; [key: string]: any }> {
-  const token = localStorage.getItem('prozen_token');
-  const activeStoreId = localStorage.getItem('prozen_active_store_id');
+  const token = localStorage.getItem('stockledger_token') || localStorage.getItem('prozen_token');
+  const activeStoreId = localStorage.getItem('stockledger_active_store_id') || localStorage.getItem('prozen_active_store_id');
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -32,6 +32,10 @@ export async function apiRequest<T = any>(
 
     if (!response.ok) {
       if (response.status === 401 && !endpoint.includes('/auth/login')) {
+        localStorage.removeItem('stockledger_token');
+        localStorage.removeItem('stockledger_user');
+        localStorage.removeItem('stockledger_stores');
+        localStorage.removeItem('stockledger_active_store_id');
         localStorage.removeItem('prozen_token');
         localStorage.removeItem('prozen_user');
         window.location.href = '/login';

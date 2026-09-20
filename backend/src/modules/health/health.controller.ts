@@ -16,7 +16,7 @@ export class HealthController {
 
       res.status(200).json({
         success: true,
-        message: 'PROZEN Store & Accounts Management API is healthy.',
+        message: 'STOCKLEDGER Store & Accounts Management API is healthy.',
         data: {
           status: 'healthy',
           timestamp: new Date().toISOString(),

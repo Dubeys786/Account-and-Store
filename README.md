@@ -1,4 +1,4 @@
-# PROZEN - Store & Accounts Management System
+# STOCKLEDGER — Store, Inventory & Accounts
 
 > Production-ready enterprise full-stack web application with dual business domains: **Store / Inventory** and **Accounts / Accounting**.
 
@@ -10,7 +10,7 @@ The application follows a refined enterprise layout based on the design system s
 - **Dark Navy Sidebar** (`#0b132a` / `#0f172a`) with distinct visual hierarchy and section headers.
 - **Active Navigation Indicator**: Vibrant royal blue (`#2563eb`) highlighting the current route.
 - **Light Content Area** (`#f8fafc` / `#ffffff`) with subtle slate borders, clean typography (Google Font Inter), and responsive data tables.
-- **Sign In to Workspace**: Navy card with pre-configured **Quick Switch Demo Roles** (Admin, Store User, Account User) for instant 1-click credential switching.
+- **Sign In to Workspace**: Secure authentication with database-enforced role authorization.
 
 ---
 

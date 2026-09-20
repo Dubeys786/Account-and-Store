@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Store, UserRole } from '../types';
+import { User, Store } from '../types';
 import { authService } from '../services/auth.service';
 
 interface AuthContextType {
@@ -8,7 +8,7 @@ interface AuthContextType {
   stores: Store[];
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; message?: string; user?: User }>;
   logout: () => void;
   setUser: (user: User | null) => void;
 }
@@ -17,16 +17,19 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('prozen_token'));
+  const [token, setToken] = useState<string | null>(
+    () => localStorage.getItem('stockledger_token') || localStorage.getItem('prozen_token')
+  );
   const [stores, setStores] = useState<Store[]>(() => {
-    const cached = localStorage.getItem('prozen_stores');
+    const cached = localStorage.getItem('stockledger_stores') || localStorage.getItem('prozen_stores');
     return cached ? JSON.parse(cached) : [];
   });
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     async function loadUser() {
-      const savedToken = localStorage.getItem('prozen_token');
+      const savedToken =
+        localStorage.getItem('stockledger_token') || localStorage.getItem('prozen_token');
       if (!savedToken) {
         setIsLoading(false);
         return;
@@ -37,15 +40,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (res.success && res.data) {
           setUser(res.data.user);
           setStores(res.data.stores);
-          localStorage.setItem('prozen_user', JSON.stringify(res.data.user));
-          localStorage.setItem('prozen_stores', JSON.stringify(res.data.stores));
 
-          const activeStoreId = localStorage.getItem('prozen_active_store_id');
+          // Store in stockledger_* keys and remove deprecated prozen_* keys
+          localStorage.setItem('stockledger_token', savedToken);
+          localStorage.setItem('stockledger_user', JSON.stringify(res.data.user));
+          localStorage.setItem('stockledger_stores', JSON.stringify(res.data.stores));
+          localStorage.removeItem('prozen_user');
+          localStorage.removeItem('prozen_stores');
+
+          const activeStoreId =
+            localStorage.getItem('stockledger_active_store_id') ||
+            localStorage.getItem('prozen_active_store_id');
           if (!activeStoreId && res.data.user.defaultStoreId) {
-            localStorage.setItem('prozen_active_store_id', res.data.user.defaultStoreId);
+            localStorage.setItem('stockledger_active_store_id', res.data.user.defaultStoreId);
+          } else if (activeStoreId) {
+            localStorage.setItem('stockledger_active_store_id', activeStoreId);
           }
+          localStorage.removeItem('prozen_active_store_id');
         } else {
           // Token invalid
+          localStorage.removeItem('stockledger_token');
+          localStorage.removeItem('stockledger_user');
+          localStorage.removeItem('stockledger_stores');
+          localStorage.removeItem('stockledger_active_store_id');
           localStorage.removeItem('prozen_token');
           localStorage.removeItem('prozen_user');
           setToken(null);
@@ -70,17 +87,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(res.data.user);
         setStores(res.data.stores);
 
-        localStorage.setItem('prozen_token', res.data.token);
-        localStorage.setItem('prozen_user', JSON.stringify(res.data.user));
-        localStorage.setItem('prozen_stores', JSON.stringify(res.data.stores));
+        localStorage.setItem('stockledger_token', res.data.token);
+        localStorage.setItem('stockledger_user', JSON.stringify(res.data.user));
+        localStorage.setItem('stockledger_stores', JSON.stringify(res.data.stores));
+
+        // Clean deprecated keys
+        localStorage.removeItem('prozen_token');
+        localStorage.removeItem('prozen_user');
+        localStorage.removeItem('prozen_stores');
 
         if (res.data.user.defaultStoreId) {
-          localStorage.setItem('prozen_active_store_id', res.data.user.defaultStoreId);
+          localStorage.setItem('stockledger_active_store_id', res.data.user.defaultStoreId);
         } else if (res.data.stores[0]?.id) {
-          localStorage.setItem('prozen_active_store_id', res.data.stores[0].id);
+          localStorage.setItem('stockledger_active_store_id', res.data.stores[0].id);
         }
 
-        return { success: true };
+        return { success: true, user: res.data.user };
       }
       return { success: false, message: res.message || 'Login failed.' };
     } catch (err: any) {

@@ -16,7 +16,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     if (stores && stores.length > 0) {
-      const savedStoreId = localStorage.getItem('prozen_active_store_id');
+      const savedStoreId =
+        localStorage.getItem('stockledger_active_store_id') ||
+        localStorage.getItem('prozen_active_store_id');
       const found = stores.find((s) => s.id === savedStoreId);
       const defaultStore = stores.find((s) => s.isDefault);
 
@@ -24,11 +26,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setActiveStoreState(found);
       } else if (defaultStore) {
         setActiveStoreState(defaultStore);
-        localStorage.setItem('prozen_active_store_id', defaultStore.id);
+        localStorage.setItem('stockledger_active_store_id', defaultStore.id);
       } else {
         setActiveStoreState(stores[0]);
-        localStorage.setItem('prozen_active_store_id', stores[0].id);
+        localStorage.setItem('stockledger_active_store_id', stores[0].id);
       }
+      localStorage.removeItem('prozen_active_store_id');
     } else {
       setActiveStoreState(null);
     }
@@ -36,7 +39,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setActiveStore = (store: Store) => {
     setActiveStoreState(store);
-    localStorage.setItem('prozen_active_store_id', store.id);
+    localStorage.setItem('stockledger_active_store_id', store.id);
   };
 
   return (

@@ -17,7 +17,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) 
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-xs font-medium text-slate-500">Loading PROZEN Workspace...</p>
+          <p className="text-xs font-medium text-slate-500">Loading STOCKLEDGER Workspace...</p>
         </div>
       </div>
     );

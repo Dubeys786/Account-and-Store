@@ -27,7 +27,7 @@ export class InwardService {
     return `INW-${year}-${seq}`;
   }
 
-  static async getMaterialInwards(filters: { storeId?: string; storeIds?: string[]; poId?: string } = {}) {
+  static async getMaterialInwards(filters: { storeId?: string; storeIds?: string[]; poId?: string; search?: string } = {}) {
     const where: any = {};
     if (filters.storeId) {
       where.storeId = filters.storeId;
@@ -35,6 +35,14 @@ export class InwardService {
       where.storeId = { in: filters.storeIds };
     }
     if (filters.poId) where.poId = filters.poId;
+    if (filters.search) {
+      where.OR = [
+        { inwardNumber: { contains: filters.search, mode: 'insensitive' } },
+        { referenceNumber: { contains: filters.search, mode: 'insensitive' } },
+        { party: { name: { contains: filters.search, mode: 'insensitive' } } },
+        { purchaseOrder: { poNumber: { contains: filters.search, mode: 'insensitive' } } },
+      ];
+    }
 
     return prisma.materialInward.findMany({
       where,

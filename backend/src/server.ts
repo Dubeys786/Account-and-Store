@@ -6,7 +6,7 @@ import logger from './utils/logger';
 
 async function startServer() {
   try {
-    logger.info('🚀 Starting PROZEN Store & Accounts Management Backend Server...');
+    logger.info('🚀 Starting STOCKLEDGER Store & Accounts Management Backend Server...');
 
     // 1. Initialize and verify PostgreSQL schema
     await initDatabase();
@@ -33,7 +33,7 @@ async function startServer() {
     // 3. Start Express HTTP Server
     const server = app.listen(env.PORT, () => {
       logger.info(`========================================================`);
-      logger.info(`  PROZEN Store & Accounts API running at: http://localhost:${env.PORT}`);
+      logger.info(`  STOCKLEDGER Store & Accounts API running at: http://localhost:${env.PORT}`);
       logger.info(`  Environment: ${env.NODE_ENV}`);
       logger.info(`  Health Check: http://localhost:${env.PORT}/api/v1/health`);
       logger.info(`========================================================`);

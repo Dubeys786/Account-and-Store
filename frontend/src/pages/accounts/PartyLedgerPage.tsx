@@ -423,8 +423,8 @@ export const PartyLedgerPage: React.FC = () => {
         <div className="hidden print:block p-4 border-b-2 border-slate-900 pb-4 mb-4">
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-2xl font-black text-slate-900 tracking-wider">PROZEN ERP</h1>
-              <p className="text-xs font-semibold text-slate-600">Enterprise Store & Accounts Management</p>
+              <h1 className="text-2xl font-black text-slate-900 tracking-wider">STOCKLEDGER</h1>
+              <p className="text-xs font-semibold text-slate-600">Store • Inventory • Accounts</p>
               <p className="text-xs text-slate-500 mt-1">Official Party Sub-Ledger Statement</p>
             </div>
             <div className="text-right text-xs text-slate-600">

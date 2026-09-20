@@ -21,6 +21,10 @@ export const authService = {
 
   async logout() {
     await apiRequest('/auth/logout', { method: 'POST' });
+    localStorage.removeItem('stockledger_token');
+    localStorage.removeItem('stockledger_user');
+    localStorage.removeItem('stockledger_stores');
+    localStorage.removeItem('stockledger_active_store_id');
     localStorage.removeItem('prozen_token');
     localStorage.removeItem('prozen_user');
     localStorage.removeItem('prozen_stores');

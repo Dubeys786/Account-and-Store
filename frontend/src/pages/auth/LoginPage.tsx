@@ -1,43 +1,33 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, Shield, Package, Calculator, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Layers, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { UserRole } from '../../types';
 
 export const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('admin@prozen.com');
-  const [password, setPassword] = useState('Prozen@123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSignIn = async (e?: React.FormEvent, customEmail?: string, customPass?: string) => {
-    if (e) e.preventDefault();
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError(null);
     setIsSubmitting(true);
 
-    const loginEmail = customEmail || email;
-    const loginPassword = customPass || password;
-
-    const result = await login(loginEmail, loginPassword);
+    const result = await login(email, password);
     setIsSubmitting(false);
 
     if (result.success) {
-      navigate('/dashboard');
+      if (result.user?.role === 'ACCOUNT_USER') {
+        navigate('/accounts/dashboard');
+      } else {
+        navigate('/dashboard');
+      }
     } else {
       setError(result.message || 'Authentication failed. Please check credentials.');
     }
-  };
-
-  const selectDemoRole = (role: UserRole) => {
-    let demoEmail = 'admin@prozen.com';
-    if (role === 'STORE_USER') demoEmail = 'store@prozen.com';
-    if (role === 'ACCOUNT_USER') demoEmail = 'account@prozen.com';
-
-    setEmail(demoEmail);
-    setPassword('Prozen@123');
-    handleSignIn(undefined, demoEmail, 'Prozen@123');
   };
 
   return (
@@ -49,10 +39,16 @@ export const LoginPage: React.FC = () => {
         {/* Card */}
         <div className="bg-[#0e172e] border border-slate-800 rounded-2xl shadow-2xl p-8 backdrop-blur-md">
           {/* Header */}
-          <div className="text-left mb-6">
-            <h2 className="text-2xl font-bold text-white tracking-tight">Sign In to Workspace</h2>
-            <p className="text-sm text-slate-400 mt-1">
-              Enter your credentials or choose a pre-configured role below
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-500/30 mb-3 text-blue-400">
+              <Layers className="w-6 h-6" />
+            </div>
+            <h1 className="text-2xl font-black text-white tracking-wider">STOCKLEDGER</h1>
+            <p className="text-xs font-semibold text-blue-400 uppercase tracking-widest mt-1">
+              Store • Inventory • Accounts
+            </p>
+            <p className="text-xs text-slate-400 mt-2">
+              Enter your credentials to access your enterprise workspace
             </p>
           </div>
 
@@ -65,7 +61,7 @@ export const LoginPage: React.FC = () => {
           )}
 
           {/* Form */}
-          <form onSubmit={(e) => handleSignIn(e)} className="space-y-4">
+          <form onSubmit={handleSignIn} className="space-y-4">
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                 EMAIL ADDRESS
@@ -80,7 +76,7 @@ export const LoginPage: React.FC = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none"
-                  placeholder="name@prozen.com"
+                  placeholder="name@company.com"
                 />
               </div>
             </div>
@@ -112,67 +108,11 @@ export const LoginPage: React.FC = () => {
               {isSubmitting ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
-
-          {/* Quick Switch Demo Roles */}
-          <div className="mt-8 pt-6 border-t border-slate-800">
-            <div className="text-center mb-3">
-              <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
-                QUICK SWITCH DEMO ROLES
-              </span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2.5">
-              {/* Admin Card */}
-              <button
-                type="button"
-                onClick={() => selectDemoRole('ADMIN')}
-                className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center transition-all ${
-                  email === 'admin@prozen.com'
-                    ? 'border-blue-500/80 bg-blue-600/15 ring-1 ring-blue-500/50'
-                    : 'border-slate-800 bg-[#121c38] hover:border-slate-700 hover:bg-[#152244]'
-                }`}
-              >
-                <Shield className="w-5 h-5 text-blue-400 mb-1.5" />
-                <span className="text-xs font-bold text-white">Admin</span>
-                <span className="text-[10px] text-slate-400">Full Access</span>
-              </button>
-
-              {/* Store User Card */}
-              <button
-                type="button"
-                onClick={() => selectDemoRole('STORE_USER')}
-                className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center transition-all ${
-                  email === 'store@prozen.com'
-                    ? 'border-emerald-500/80 bg-emerald-600/15 ring-1 ring-emerald-500/50'
-                    : 'border-slate-800 bg-[#121c38] hover:border-slate-700 hover:bg-[#152244]'
-                }`}
-              >
-                <Package className="w-5 h-5 text-emerald-400 mb-1.5" />
-                <span className="text-xs font-bold text-white">Store User</span>
-                <span className="text-[10px] text-slate-400">Inventory</span>
-              </button>
-
-              {/* Account User Card */}
-              <button
-                type="button"
-                onClick={() => selectDemoRole('ACCOUNT_USER')}
-                className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center transition-all ${
-                  email === 'account@prozen.com'
-                    ? 'border-purple-500/80 bg-purple-600/15 ring-1 ring-purple-500/50'
-                    : 'border-slate-800 bg-[#121c38] hover:border-slate-700 hover:bg-[#152244]'
-                }`}
-              >
-                <Calculator className="w-5 h-5 text-purple-400 mb-1.5" />
-                <span className="text-xs font-bold text-white">Account User</span>
-                <span className="text-[10px] text-slate-400">Accounting</span>
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Footer info */}
         <p className="text-center text-xs text-slate-600 mt-6 font-medium">
-          PROZEN Enterprise v1.0.0 • Secure Multi-Tenant Architecture
+          STOCKLEDGER Enterprise • Store, Inventory & Accounts
         </p>
       </div>
     </div>

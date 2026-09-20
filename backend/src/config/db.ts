@@ -58,8 +58,8 @@ function initPGliteInstance(): PGlite {
   }
 }
 
-export const pglite: PGlite = initPGliteInstance();
-export const pgliteAdapter = new PrismaPGlite(pglite);
+export let pglite: PGlite = initPGliteInstance();
+export let pgliteAdapter = new PrismaPGlite(pglite);
 
 /**
  * Check if the host and port in DATABASE_URL are listening
@@ -121,14 +121,41 @@ if (env.NODE_ENV !== 'production') {
   global.prismaInstance = prismaClient;
 }
 
-export const prisma = prismaClient;
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    return (prismaClient as any)[prop];
+  },
+});
 
 /**
  * Initialize database schema and verify connectivity
  */
 export async function initDatabase(): Promise<void> {
   try {
-    await pglite.waitReady;
+    try {
+      await pglite.waitReady;
+    } catch (e: any) {
+      console.warn('⚠️ PGlite storage corruption detected, restoring fresh storage engine...');
+      const bakDir = path.resolve(__dirname, `../../prisma/pgdata_corrupt_${Date.now()}`);
+      try {
+        fs.renameSync(dataDir, bakDir);
+      } catch {
+        try {
+          fs.rmSync(dataDir, { recursive: true, force: true });
+        } catch {}
+      }
+      fs.mkdirSync(dataDir, { recursive: true });
+      pglite = new PGlite(dataDir);
+      await pglite.waitReady;
+      pgliteAdapter = new PrismaPGlite(pglite);
+      prismaClient = new PrismaClient({
+        adapter: pgliteAdapter as any,
+        log: env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+      });
+      global.pgliteInstance = pglite;
+      global.prismaInstance = prismaClient;
+    }
+
     console.log('🔍 Checking database connectivity and schema...');
 
     const res = await pglite.query<{ count: string }>(

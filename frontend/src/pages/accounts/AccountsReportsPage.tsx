@@ -292,7 +292,7 @@ export const AccountsReportsPage: React.FC = () => {
       <head><meta charset="utf-8"/></head>
       <body>
         <h2 style="font-family:sans-serif;">${reportData.reportTitle}</h2>
-        <p style="font-family:sans-serif;font-size:12px;color:#64748b;">Generated: ${new Date().toLocaleString()} | PROZEN Store & Accounts</p>
+        <p style="font-family:sans-serif;font-size:12px;color:#64748b;">Generated: ${new Date().toLocaleString()} | STOCKLEDGER — Store, Inventory & Accounts</p>
         <table border="1" style="font-family:sans-serif;font-size:12px;border-collapse:collapse;">
           ${headerHtml}
           ${rowsHtml}

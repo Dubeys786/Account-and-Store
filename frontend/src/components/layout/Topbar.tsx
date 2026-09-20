@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { Bell, Search, Store as StoreIcon, ShieldCheck, User as UserIcon, Menu } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useStore } from '../../context/StoreContext';
@@ -10,6 +11,7 @@ interface TopbarProps {
 export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileMenu }) => {
   const { user } = useAuth();
   const { activeStore, setActiveStore, availableStores } = useStore();
+  const location = useLocation();
 
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-20 shadow-2xs">
@@ -36,6 +38,31 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileMenu }) => {
 
       {/* Right Controls */}
       <div className="flex items-center gap-4">
+        {/* Workspace Switcher (for dual-role ADMIN users) */}
+        {user?.role === 'ADMIN' && (
+          <div className="hidden sm:flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
+            <Link
+              to="/dashboard"
+              className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+                !location.pathname.startsWith('/accounts')
+                  ? 'bg-white text-blue-600 shadow-2xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Store Hub
+            </Link>
+            <Link
+              to="/accounts/dashboard"
+              className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+                location.pathname.startsWith('/accounts')
+                  ? 'bg-white text-blue-600 shadow-2xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Accounts Hub
+            </Link>
+          </div>
+        )}
         {/* Store Switcher */}
         {availableStores.length > 0 && (
           <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
