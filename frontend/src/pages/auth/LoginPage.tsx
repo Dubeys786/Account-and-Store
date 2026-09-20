@@ -19,8 +19,17 @@ export const LoginPage: React.FC = () => {
     const result = await login(email, password);
     setIsSubmitting(false);
 
-    if (result.success) {
-      if (result.user?.role === 'ACCOUNT_USER') {
+    if (result.success && result.user) {
+      const { accessibleWorkspaces } = result.user;
+      const hasStore = accessibleWorkspaces?.store ?? false;
+      const hasAccounts = accessibleWorkspaces?.accounts ?? false;
+      const isAdmin = accessibleWorkspaces?.admin ?? false;
+
+      if (!hasStore && !hasAccounts && !isAdmin) {
+        navigate('/unassigned');
+      } else if (isAdmin || (hasStore && hasAccounts)) {
+        navigate('/workspace');
+      } else if (hasAccounts && !hasStore) {
         navigate('/accounts/dashboard');
       } else {
         navigate('/dashboard');

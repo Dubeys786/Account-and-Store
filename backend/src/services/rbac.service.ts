@@ -35,29 +35,9 @@ export class RbacService {
       for (const assignment of assignments) {
         if (assignment.role?.rolePermissions) {
           for (const rp of assignment.role.rolePermissions) {
-            if (rp.permission?.code) {
-              permissionSet.add(rp.permission.code);
+            if (rp.permission?.name) {
+              permissionSet.add(rp.permission.name);
             }
-          }
-        }
-      }
-    } else if (legacyRole) {
-      // Backwards compatibility fallback if user hasn't been migrated yet
-      roles = [legacyRole];
-      const legacyRoleRecord = await prisma.role.findUnique({
-        where: { name: legacyRole },
-        include: {
-          rolePermissions: {
-            include: {
-              permission: true,
-            },
-          },
-        },
-      });
-      if (legacyRoleRecord?.rolePermissions) {
-        for (const rp of legacyRoleRecord.rolePermissions) {
-          if (rp.permission?.code) {
-            permissionSet.add(rp.permission.code);
           }
         }
       }

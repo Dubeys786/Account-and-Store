@@ -353,7 +353,7 @@ export class AdminService {
       isSystem: r.isSystem,
       userCount: r._count.userRoles,
       permissionCount: r.rolePermissions.length,
-      permissions: r.rolePermissions.map((rp) => rp.permission.code),
+      permissions: r.rolePermissions.map((rp) => rp.permission.name),
     }));
   }
 
@@ -362,7 +362,7 @@ export class AdminService {
    */
   static async getPermissions() {
     const permissions = await prisma.permission.findMany({
-      orderBy: [{ module: 'asc' }, { code: 'asc' }],
+      orderBy: [{ module: 'asc' }, { name: 'asc' }],
     });
 
     const grouped: Record<string, typeof permissions> = {};

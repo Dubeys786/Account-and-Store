@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Store } from '../types';
+import { User, Store, AccessibleWorkspaces } from '../types';
 import { authService } from '../services/auth.service';
 
 interface AuthContextType {
@@ -8,6 +8,11 @@ interface AuthContextType {
   stores: Store[];
   isAuthenticated: boolean;
   isLoading: boolean;
+  accessibleWorkspaces: AccessibleWorkspaces;
+  hasRole: (role: string | string[]) => boolean;
+  hasPermission: (permission: string) => boolean;
+  hasAnyPermission: (permissions: string[]) => boolean;
+  hasAllPermissions: (permissions: string[]) => boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string; user?: User }>;
   logout: () => void;
   setUser: (user: User | null) => void;
@@ -78,6 +83,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadUser();
   }, []);
 
+  const userRoles = user?.roles || (user?.role ? [user.role] : []);
+  const userPerms = user?.permissions || [];
+  const isAdmin = userRoles.includes('ADMIN') || user?.role === 'ADMIN';
+
+  const hasRole = (role: string | string[]): boolean => {
+    if (!user) return false;
+    if (isAdmin) return true;
+    const rolesToCheck = Array.isArray(role) ? role : [role];
+    return rolesToCheck.some((r) => userRoles.includes(r));
+  };
+
+  const hasPermission = (permission: string): boolean => {
+    if (!user) return false;
+    if (isAdmin) return true;
+    return userPerms.includes(permission);
+  };
+
+  const hasAnyPermission = (permissions: string[]): boolean => {
+    if (!user) return false;
+    if (isAdmin) return true;
+    return permissions.some((p) => userPerms.includes(p));
+  };
+
+  const hasAllPermissions = (permissions: string[]): boolean => {
+    if (!user) return false;
+    if (isAdmin) return true;
+    return permissions.every((p) => userPerms.includes(p));
+  };
+
+  const accessibleWorkspaces: AccessibleWorkspaces = user?.accessibleWorkspaces || {
+    store: isAdmin || userRoles.some((r) => ['STORE_MANAGER', 'STORE_USER'].includes(r)),
+    accounts: isAdmin || userRoles.some((r) => ['ACCOUNT_MANAGER', 'ACCOUNT_USER'].includes(r)),
+    admin: isAdmin,
+  };
+
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
@@ -127,6 +167,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         stores,
         isAuthenticated: !!token && !!user,
         isLoading,
+        accessibleWorkspaces,
+        hasRole,
+        hasPermission,
+        hasAnyPermission,
+        hasAllPermissions,
         login,
         logout,
         setUser,

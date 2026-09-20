@@ -16,12 +16,10 @@ export function requireRoles(allowedRoles: (string | UserRole)[]) {
       return;
     }
 
-    const userRoles = req.user.roles && req.user.roles.length > 0 
-      ? req.user.roles 
-      : [String(req.user.role)];
+    const userRoles = req.user.roles || [];
 
     // Admin has universal superuser access
-    if (userRoles.includes('ADMIN') || req.user.role === UserRole.ADMIN) {
+    if (userRoles.includes('ADMIN')) {
       return next();
     }
 
@@ -54,12 +52,10 @@ export function requirePermissions(requiredPermissions: string | string[], match
       return;
     }
 
-    const userRoles = req.user.roles && req.user.roles.length > 0 
-      ? req.user.roles 
-      : [String(req.user.role)];
+    const userRoles = req.user.roles || [];
 
     // Admin has universal superuser access
-    if (userRoles.includes('ADMIN') || req.user.role === UserRole.ADMIN) {
+    if (userRoles.includes('ADMIN')) {
       return next();
     }
 
@@ -92,12 +88,10 @@ export function requireStoreAccess(req: Request, res: Response, next: NextFuncti
     return;
   }
 
-  const userRoles = req.user.roles && req.user.roles.length > 0 
-    ? req.user.roles 
-    : [String(req.user.role)];
+  const userRoles = req.user.roles || [];
 
   // Admin has access to all stores
-  if (userRoles.includes('ADMIN') || req.user.role === UserRole.ADMIN) {
+  if (userRoles.includes('ADMIN')) {
     return next();
   }
 
