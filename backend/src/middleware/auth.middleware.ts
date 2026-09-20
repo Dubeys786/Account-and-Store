@@ -38,6 +38,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       include: {
+        profile: true,
         storeUsers: {
           select: { storeId: true, isDefault: true },
         },
@@ -54,16 +55,27 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
     const defaultStore = user.storeUsers.find((su) => su.isDefault);
 
-    const rbacData = await RbacService.getUserRbacData(user.id, user.role);
+    const rbacData = await RbacService.getUserRbacData(user.id);
+
+    const jobTitle = user.jobTitle || user.profile?.jobTitle || (rbacData.roles.includes('STORE_INCHARGE') ? 'Store Incharge' : 'Account & Store Incharge');
+    const workspace = user.workspace || user.profile?.workspace || (rbacData.roles.includes('STORE_INCHARGE') ? 'Store' : 'Accounts');
 
     const authUser: AuthUser = {
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
+      jobTitle,
+      workspace,
       roles: rbacData.roles,
       permissions: rbacData.permissions,
       accessibleWorkspaces: rbacData.accessibleWorkspaces,
+      profile: {
+        full_name: user.profile?.fullName || user.name,
+        email: user.profile?.email || user.email,
+        job_title: jobTitle,
+        workspace,
+      },
       phone: user.phone,
       storeIds: user.storeUsers.map((su) => su.storeId),
       defaultStoreId: defaultStore ? defaultStore.storeId : user.storeUsers[0]?.storeId || null,

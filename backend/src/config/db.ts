@@ -282,10 +282,39 @@ export async function initDatabase(): Promise<void> {
             );
             ALTER TABLE "store_users" ADD COLUMN IF NOT EXISTS "accessLevel" TEXT NOT NULL DEFAULT 'FULL';
             ALTER TABLE "store_users" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN NOT NULL DEFAULT true;
+            ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "job_title" TEXT;
+            ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "workspace" TEXT;
+            CREATE TABLE IF NOT EXISTS "profiles" (
+              "id" TEXT PRIMARY KEY,
+              "user_id" TEXT NOT NULL UNIQUE REFERENCES "users"("id") ON DELETE CASCADE,
+              "full_name" TEXT NOT NULL,
+              "email" TEXT NOT NULL,
+              "job_title" TEXT NOT NULL,
+              "workspace" TEXT NOT NULL,
+              "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
           `);
-          console.log('✅ RBAC schema applied via fallback DDL execution.');
+          console.log('✅ RBAC and Profile schema applied via DDL execution.');
         }
       }
+
+      // Always ensure profile table and user profile columns exist
+      await pglite.exec(`
+        ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "job_title" TEXT;
+        ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "workspace" TEXT;
+        CREATE TABLE IF NOT EXISTS "profiles" (
+          "id" TEXT PRIMARY KEY,
+          "user_id" TEXT NOT NULL UNIQUE REFERENCES "users"("id") ON DELETE CASCADE,
+          "full_name" TEXT NOT NULL,
+          "email" TEXT NOT NULL,
+          "job_title" TEXT NOT NULL,
+          "workspace" TEXT NOT NULL,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      console.log('✅ User Profile schema (job_title, workspace, profiles) verified.');
     } catch (e: any) {
       console.warn('RBAC schema migration check:', e.message || e);
     }

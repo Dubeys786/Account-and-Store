@@ -23,20 +23,20 @@ import apiRequest from '../../services/api';
 import { Link, useNavigate } from 'react-router-dom';
 
 export const DashboardPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, accessibleWorkspaces } = useAuth();
   const { activeStore } = useStore();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user && user.role === 'ACCOUNT_USER') {
-      navigate('/accounts/dashboard', { replace: true });
+    if (user && !accessibleWorkspaces.store && accessibleWorkspaces.accounts) {
+      navigate('/accounts', { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, accessibleWorkspaces, navigate]);
 
   useEffect(() => {
-    if (!user || user.role === 'ACCOUNT_USER') return;
+    if (!user || !accessibleWorkspaces.store) return;
     async function loadMetrics() {
       setLoading(true);
       const res = await apiRequest('/store/dashboard-metrics');
@@ -46,59 +46,29 @@ export const DashboardPage: React.FC = () => {
       setLoading(false);
     }
     loadMetrics();
-  }, [user, activeStore]);
+  }, [user, accessibleWorkspaces, activeStore]);
 
   const cards = data?.kpiCards || {};
   const recentPOs = data?.recentPOs || [];
   const recentInwards = data?.recentInwards || [];
   const recentTransactions = data?.recentTransactions || [];
 
-  if (user?.role === 'ACCOUNT_USER') {
+  if (!accessibleWorkspaces.store) {
     return null;
   }
 
   return (
     <div className="space-y-6">
-      {/* Workspace Selection Banner (for users with multi-workspace access) */}
-      {user?.role === 'ADMIN' && (
-        <div className="bg-gradient-to-r from-slate-900 via-[#0e172e] to-blue-950 text-white rounded-2xl p-5 shadow-xl border border-slate-800">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 bg-blue-500/30 text-blue-200 rounded border border-blue-400/30">
-                  MULTI-WORKSPACE ACTIVE
-                </span>
-                <span className="text-xs text-slate-300">Admin Account</span>
-              </div>
-              <h2 className="text-lg font-bold text-white tracking-tight">Select Active Workspace</h2>
-              <p className="text-xs text-slate-400">
-                You have dual authorization. Switch between Store / Inventory operations and Accounts / Accounting hub.
-              </p>
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <Link
-                to="/dashboard"
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5"
-              >
-                <Package className="w-4 h-4" />
-                Store / Inventory
-              </Link>
-              <Link
-                to="/accounts/dashboard"
-                className="px-4 py-2 bg-[#172554] hover:bg-[#1e3a8a] text-blue-200 font-bold text-xs rounded-xl border border-blue-500/30 shadow-md transition-all flex items-center gap-1.5"
-              >
-                <CreditCard className="w-4 h-4 text-blue-300" />
-                Accounts / Accounting
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Enterprise Dashboard</h1>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+              {user?.jobTitle || 'Store Incharge'}
+            </span>
+            {user?.name && <span className="text-xs font-medium text-slate-500">• {user.name}</span>}
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Store & Inventory Dashboard</h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Store & Inventory Operations Hub for{' '}
             <span className="font-semibold text-slate-700">{activeStore?.name || 'All Stores'}</span>

@@ -39,44 +39,28 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileMenu }) => {
       {/* Right Controls */}
       <div className="flex items-center gap-4">
         {/* Workspace Switcher (for multi-workspace users) */}
-        {((accessibleWorkspaces.store && accessibleWorkspaces.accounts) || accessibleWorkspaces.admin) && (
+        {accessibleWorkspaces.store && accessibleWorkspaces.accounts && (
           <div className="hidden sm:flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
-            {accessibleWorkspaces.store && (
-              <Link
-                to="/dashboard"
-                className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                  !location.pathname.startsWith('/accounts') && !location.pathname.startsWith('/admin')
-                    ? 'bg-white text-blue-600 shadow-2xs font-semibold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Store
-              </Link>
-            )}
-            {accessibleWorkspaces.accounts && (
-              <Link
-                to="/accounts/dashboard"
-                className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                  location.pathname.startsWith('/accounts')
-                    ? 'bg-white text-blue-600 shadow-2xs font-semibold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Accounts
-              </Link>
-            )}
-            {accessibleWorkspaces.admin && (
-              <Link
-                to="/admin/users"
-                className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                  location.pathname.startsWith('/admin')
-                    ? 'bg-white text-purple-600 shadow-2xs font-semibold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Admin
-              </Link>
-            )}
+            <Link
+              to="/store"
+              className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+                !location.pathname.startsWith('/accounts')
+                  ? 'bg-white text-blue-600 shadow-2xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Store
+            </Link>
+            <Link
+              to="/accounts"
+              className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+                location.pathname.startsWith('/accounts')
+                  ? 'bg-white text-blue-600 shadow-2xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Accounts
+            </Link>
           </div>
         )}
         {/* Store Switcher */}
@@ -120,8 +104,8 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileMenu }) => {
             <span className="text-xs font-bold text-slate-800 leading-tight">{user?.name}</span>
             <div className="flex items-center gap-1">
               <ShieldCheck className="w-3 h-3 text-emerald-600" />
-              <span className="text-[10px] font-semibold text-slate-500 truncate max-w-[120px]" title={user?.roles?.join(', ') || user?.role}>
-                {user?.roles?.join(', ') || user?.role}
+              <span className="text-[10px] font-semibold text-slate-500 truncate max-w-[140px]" title={user?.jobTitle || user?.roles?.join(', ') || user?.role}>
+                {user?.jobTitle || user?.roles?.join(', ') || user?.role}
               </span>
             </div>
           </div>

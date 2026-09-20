@@ -644,11 +644,11 @@ async function runAccountsTests() {
         'IDOR Prevention: Mutating party belonging to unauthorized store is BLOCKED with HTTP 403'
       );
 
-      // 5.5 ADMIN can access Store 2 party cleanly
+      // 5.5 ADMIN role is decommissioned and blocked from Accounts domain (HTTP 403)
       const adminAccessRes = await fetch(`${baseUrl}/accounts/parties/${store2Party.id}`, {
         headers: adminHeaders,
       });
-      assert(adminAccessRes.status === 200, 'ADMIN has global access across all stores and parties (HTTP 200)');
+      assert(adminAccessRes.status === 403, 'ADMIN role is blocked from Accounts domain (HTTP 403)');
     }
 
     // 5.6 Non-existent party ID -> HTTP 404

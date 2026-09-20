@@ -26,6 +26,7 @@ import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import apiRequest from '../../services/api';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 interface DashboardMetrics {
   totalPayables: number;
@@ -100,6 +101,7 @@ interface DashboardAnalytics {
 }
 
 export const AccountsDashboardPage: React.FC = () => {
+  const { user } = useAuth();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -178,12 +180,13 @@ export const AccountsDashboardPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 mb-1">
-            <span>FINANCE</span>
-            <span>/</span>
-            <span className="text-blue-600">ACCOUNTS OVERVIEW</span>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              {user?.jobTitle || 'Account & Store Incharge'}
+            </span>
+            {user?.name && <span className="text-xs font-medium text-slate-500">• {user.name}</span>}
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Accounts Dashboard</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Accounts & Finance Dashboard</h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Real-time financial positions, trade liabilities, cash flows, and operating ledger metrics
           </p>

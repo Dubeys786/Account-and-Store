@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import prisma from './db';
 
 export const DEFINED_PERMISSIONS = [
@@ -48,53 +49,79 @@ export const DEFINED_PERMISSIONS = [
   { name: 'day_book.view', module: 'ACCOUNTS', description: 'View chronological day book' },
   { name: 'cash_book.view', module: 'ACCOUNTS', description: 'View cash register (1010)' },
   { name: 'bank_book.view', module: 'ACCOUNTS', description: 'View bank register (1020)' },
-  { name: 'accounting_reports.view', module: 'ACCOUNTS', description: 'Generate statutory financial reports' },
-  { name: 'account_settings.view', module: 'ACCOUNTS', description: 'View accounting configuration' },
-  { name: 'account_settings.manage', module: 'ACCOUNTS', description: 'Modify fiscal year and GST settings' },
+  { name: 'accounting_reports.view', module: 'ACCOUNTS', description: 'Generate accounting and financial reports' },
+  { name: 'account_settings.view', module: 'ACCOUNTS', description: 'View account preferences and configurations' },
+  { name: 'account_settings.manage', module: 'ACCOUNTS', description: 'Manage accounting chart and settings' },
+];
 
-  // Administration permissions
-  { name: 'users.view', module: 'ADMIN', description: 'View users list' },
-  { name: 'users.create', module: 'ADMIN', description: 'Create new users' },
-  { name: 'users.edit', module: 'ADMIN', description: 'Update user profiles and status' },
-  { name: 'users.disable', module: 'ADMIN', description: 'Deactivate user accounts' },
-  { name: 'roles.view', module: 'ADMIN', description: 'View roles' },
-  { name: 'roles.manage', module: 'ADMIN', description: 'Assign and update user roles' },
-  { name: 'permissions.view', module: 'ADMIN', description: 'View defined permissions' },
-  { name: 'permissions.manage', module: 'ADMIN', description: 'Modify role permission mappings' },
-  { name: 'audit_logs.view', module: 'ADMIN', description: 'View system audit logs' },
-  { name: 'system_settings.manage', module: 'ADMIN', description: 'Manage enterprise system settings' },
+const STORE_PERMISSIONS = [
+  'store.view',
+  'store.create',
+  'store.edit',
+  'store.delete',
+  'item.view',
+  'item.create',
+  'item.edit',
+  'item.delete',
+  'po.view',
+  'po.create',
+  'po.edit',
+  'po.approve',
+  'material_inward.view',
+  'material_inward.create',
+  'material_inward.edit',
+  'stock.view',
+  'stock.issue',
+  'stock.return',
+  'store_reports.view',
+];
+
+const ACCOUNTS_PERMISSIONS = [
+  'accounts.view',
+  'party.view',
+  'party.create',
+  'party.edit',
+  'purchase.view',
+  'purchase.create',
+  'purchase.edit',
+  'purchase.with_po',
+  'purchase.without_po',
+  'ledger.view',
+  'receivables.view',
+  'payables.view',
+  'payment.view',
+  'payment.create',
+  'payment.approve',
+  'receipt.view',
+  'receipt.create',
+  'expense.view',
+  'expense.create',
+  'expense.approve',
+  'income.view',
+  'income.create',
+  'day_book.view',
+  'cash_book.view',
+  'bank_book.view',
+  'accounting_reports.view',
+  'account_settings.view',
+  'account_settings.manage',
 ];
 
 export const ROLE_DEFINITIONS: Record<string, { description: string; permissions: string[] }> = {
-  ADMIN: {
-    description: 'System Administrator with full access across Store, Accounts, and Administration',
-    permissions: DEFINED_PERMISSIONS.map((p) => p.name),
+  STORE_INCHARGE: {
+    description: 'Store Incharge with full operational and management authority over Store & Inventory',
+    permissions: STORE_PERMISSIONS,
+  },
+  ACCOUNT_AND_STORE_INCHARGE: {
+    description: 'Account & Store Incharge with primary access to Accounts & Finance',
+    permissions: ACCOUNTS_PERMISSIONS,
   },
   STORE_MANAGER: {
-    description: 'Store & Inventory Manager with full control over catalog, POs, inward, and inventory',
-    permissions: [
-      'store.view',
-      'store.create',
-      'store.edit',
-      'item.view',
-      'item.create',
-      'item.edit',
-      'item.delete',
-      'po.view',
-      'po.create',
-      'po.edit',
-      'po.approve',
-      'material_inward.view',
-      'material_inward.create',
-      'material_inward.edit',
-      'stock.view',
-      'stock.issue',
-      'stock.return',
-      'store_reports.view',
-    ],
+    description: 'Store Manager operational role',
+    permissions: STORE_PERMISSIONS,
   },
   STORE_USER: {
-    description: 'Standard Store Operator with daily catalog view, PO viewing, inward receipt, and stock movement',
+    description: 'Store operational user role',
     permissions: [
       'store.view',
       'item.view',
@@ -108,95 +135,21 @@ export const ROLE_DEFINITIONS: Record<string, { description: string; permissions
     ],
   },
   ACCOUNT_MANAGER: {
-    description: 'Finance & Accounting Manager with full control over parties, bills, ledgers, books, and reports',
-    permissions: [
-      'accounts.view',
-      'party.view',
-      'party.create',
-      'party.edit',
-      'purchase.view',
-      'purchase.create',
-      'purchase.edit',
-      'purchase.with_po',
-      'purchase.without_po',
-      'ledger.view',
-      'receivables.view',
-      'payables.view',
-      'payment.view',
-      'payment.create',
-      'payment.approve',
-      'receipt.view',
-      'receipt.create',
-      'expense.view',
-      'expense.create',
-      'expense.approve',
-      'income.view',
-      'income.create',
-      'day_book.view',
-      'cash_book.view',
-      'bank_book.view',
-      'accounting_reports.view',
-      'account_settings.view',
-      'account_settings.manage',
-    ],
+    description: 'Accounting manager role',
+    permissions: ACCOUNTS_PERMISSIONS,
   },
   ACCOUNT_USER: {
-    description: 'Accounting Operator with ledger, bills, and voucher creation access',
-    permissions: [
-      'accounts.view',
-      'party.view',
-      'party.create',
-      'purchase.view',
-      'purchase.create',
-      'purchase.with_po',
-      'purchase.without_po',
-      'ledger.view',
-      'receivables.view',
-      'payables.view',
-      'payment.view',
-      'payment.create',
-      'receipt.view',
-      'receipt.create',
-      'expense.view',
-      'expense.create',
-      'income.view',
-      'income.create',
-      'day_book.view',
-      'cash_book.view',
-      'bank_book.view',
-      'accounting_reports.view',
-      'account_settings.view',
-    ],
+    description: 'Accounting operator role',
+    permissions: ACCOUNTS_PERMISSIONS.filter((p) => !p.endsWith('.approve') && !p.endsWith('.manage')),
   },
   VIEWER: {
-    description: 'Read-only observer with cross-module viewing permissions but no mutation privileges',
-    permissions: [
-      'store.view',
-      'item.view',
-      'po.view',
-      'material_inward.view',
-      'stock.view',
-      'store_reports.view',
-      'accounts.view',
-      'party.view',
-      'purchase.view',
-      'ledger.view',
-      'receivables.view',
-      'payables.view',
-      'payment.view',
-      'receipt.view',
-      'expense.view',
-      'income.view',
-      'day_book.view',
-      'cash_book.view',
-      'bank_book.view',
-      'accounting_reports.view',
-    ],
+    description: 'Read-only viewer role',
+    permissions: ['store.view', 'accounts.view'],
   },
 };
 
 export async function seedRbacSystem() {
-  console.log('🔒 Seeding RBAC Roles, Permissions, and Mappings...');
+  console.log('🔒 Seeding RBAC Roles, Permissions, and Two-User System Access...');
 
   // 1. Seed Permissions
   for (const p of DEFINED_PERMISSIONS) {
@@ -219,7 +172,6 @@ export async function seedRbacSystem() {
       },
     });
 
-    // Fetch permission IDs for this role
     const perms = await prisma.permission.findMany({
       where: { name: { in: def.permissions } },
       select: { id: true },
@@ -242,30 +194,143 @@ export async function seedRbacSystem() {
     }
   }
 
-  // 3. Sync User Roles for existing users based on their primary role
-  const allUsers = await prisma.user.findMany({
-    include: { userRoles: true },
+  // 3. Lookup stores
+  const stores = await prisma.store.findMany();
+  const mainStore = stores.find((s) => s.code === 'STR-001') || stores[0];
+  const branchStore = stores.find((s) => s.code === 'STR-002') || stores[1];
+
+  const storeInchargeRole = await prisma.role.findUnique({ where: { name: 'STORE_INCHARGE' } });
+  const acctInchargeRole = await prisma.role.findUnique({
+    where: { name: 'ACCOUNT_AND_STORE_INCHARGE' },
   });
 
-  const roles = await prisma.role.findMany();
-  const roleMap = new Map(roles.map((r) => [r.name, r.id]));
+  // Secure default hash for initial setup from environment or bcrypt generator
+  const envPassword = process.env.INITIAL_USER_PASSWORD || 'Stockledger@123';
+  const defaultPasswordHash = await bcrypt.hash(envPassword, 10);
 
-  for (const user of allUsers) {
-    let targetRoleName = 'VIEWER';
-    if (user.role === 'ADMIN') targetRoleName = 'ADMIN';
-    else if (user.role === 'STORE_USER') targetRoleName = 'STORE_USER';
-    else if (user.role === 'ACCOUNT_USER') targetRoleName = 'ACCOUNT_USER';
+  // 4. Configure User 1 — Sakshi (dubeysakshi618@gmail.com)
+  const sakshi = await prisma.user.upsert({
+    where: { email: 'dubeysakshi618@gmail.com' },
+    update: {
+      name: 'Sakshi',
+      jobTitle: 'Store Incharge',
+      workspace: 'Store',
+      role: 'STORE_USER',
+      isActive: true,
+    },
+    create: {
+      name: 'Sakshi',
+      email: 'dubeysakshi618@gmail.com',
+      passwordHash: defaultPasswordHash,
+      role: 'STORE_USER',
+      jobTitle: 'Store Incharge',
+      workspace: 'Store',
+      isActive: true,
+    },
+  });
 
-    const roleId = roleMap.get(targetRoleName);
-    if (roleId && !user.userRoles.some((ur) => ur.roleId === roleId)) {
-      await prisma.userRoleAssignment.create({
-        data: {
-          userId: user.id,
-          roleId,
-        },
+  if (storeInchargeRole) {
+    await prisma.userRoleAssignment.deleteMany({ where: { userId: sakshi.id } });
+    await prisma.userRoleAssignment.create({
+      data: {
+        userId: sakshi.id,
+        roleId: storeInchargeRole.id,
+      },
+    });
+  }
+
+  // Create Profile for Sakshi
+  await prisma.profile.upsert({
+    where: { userId: sakshi.id },
+    update: {
+      fullName: 'Sakshi',
+      email: 'dubeysakshi618@gmail.com',
+      jobTitle: 'Store Incharge',
+      workspace: 'Store',
+    },
+    create: {
+      userId: sakshi.id,
+      fullName: 'Sakshi',
+      email: 'dubeysakshi618@gmail.com',
+      jobTitle: 'Store Incharge',
+      workspace: 'Store',
+    },
+  });
+
+  // Assign store access for Sakshi
+  if (mainStore) {
+    await prisma.storeUser.deleteMany({ where: { userId: sakshi.id } });
+    await prisma.storeUser.create({
+      data: { userId: sakshi.id, storeId: mainStore.id, isDefault: true },
+    });
+    if (branchStore) {
+      await prisma.storeUser.create({
+        data: { userId: sakshi.id, storeId: branchStore.id, isDefault: false },
       });
     }
   }
 
-  console.log('✅ RBAC Roles & Permissions seeded successfully.');
+  // 5. Configure User 2 — Akhilesh (dubeyakhilesh2005@gmail.com)
+  const akhilesh = await prisma.user.upsert({
+    where: { email: 'dubeyakhilesh2005@gmail.com' },
+    update: {
+      name: 'Akhilesh',
+      jobTitle: 'Account & Store Incharge',
+      workspace: 'Accounts',
+      role: 'ACCOUNT_USER',
+      isActive: true,
+    },
+    create: {
+      name: 'Akhilesh',
+      email: 'dubeyakhilesh2005@gmail.com',
+      passwordHash: defaultPasswordHash,
+      role: 'ACCOUNT_USER',
+      jobTitle: 'Account & Store Incharge',
+      workspace: 'Accounts',
+      isActive: true,
+    },
+  });
+
+  if (acctInchargeRole) {
+    await prisma.userRoleAssignment.deleteMany({ where: { userId: akhilesh.id } });
+    await prisma.userRoleAssignment.create({
+      data: {
+        userId: akhilesh.id,
+        roleId: acctInchargeRole.id,
+      },
+    });
+  }
+
+  // Create Profile for Akhilesh
+  await prisma.profile.upsert({
+    where: { userId: akhilesh.id },
+    update: {
+      fullName: 'Akhilesh',
+      email: 'dubeyakhilesh2005@gmail.com',
+      jobTitle: 'Account & Store Incharge',
+      workspace: 'Accounts',
+    },
+    create: {
+      userId: akhilesh.id,
+      fullName: 'Akhilesh',
+      email: 'dubeyakhilesh2005@gmail.com',
+      jobTitle: 'Account & Store Incharge',
+      workspace: 'Accounts',
+    },
+  });
+
+  // Assign store access for Akhilesh
+  if (mainStore) {
+    await prisma.storeUser.deleteMany({ where: { userId: akhilesh.id } });
+    await prisma.storeUser.create({
+      data: { userId: akhilesh.id, storeId: mainStore.id, isDefault: true },
+    });
+    if (branchStore) {
+      await prisma.storeUser.create({
+        data: { userId: akhilesh.id, storeId: branchStore.id, isDefault: false },
+      });
+    }
+  }
+
+  console.log('✅ Two Users (Sakshi & Akhilesh) seeded with Database Profiles and RBAC roles.');
 }

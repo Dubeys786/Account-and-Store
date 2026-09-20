@@ -38,9 +38,6 @@ import { BankBookPage } from './pages/accounts/BankBookPage';
 import { AccountsReportsPage } from './pages/accounts/AccountsReportsPage';
 import { AccountSettingsPage } from './pages/accounts/AccountSettingsPage';
 
-// Admin Pages
-import { AdminUsersPage } from './pages/admin/AdminUsersPage';
-
 /**
  * Intelligent root dispatcher routing based strictly on database-stored permissions
  */
@@ -50,21 +47,20 @@ const RootRedirect: React.FC = () => {
 
   const hasStore = accessibleWorkspaces?.store ?? false;
   const hasAccounts = accessibleWorkspaces?.accounts ?? false;
-  const isAdmin = accessibleWorkspaces?.admin ?? false;
 
-  if (!hasStore && !hasAccounts && !isAdmin) {
+  if (!hasStore && !hasAccounts) {
     return <Navigate to="/unassigned" replace />;
   }
 
-  if (isAdmin || (hasStore && hasAccounts)) {
+  if (hasStore && hasAccounts) {
     return <Navigate to="/workspace" replace />;
   }
 
   if (hasAccounts && !hasStore) {
-    return <Navigate to="/accounts/dashboard" replace />;
+    return <Navigate to="/accounts" replace />;
   }
 
-  return <Navigate to="/dashboard" replace />;
+  return <Navigate to="/store" replace />;
 };
 
 export const App: React.FC = () => {
@@ -89,15 +85,16 @@ export const App: React.FC = () => {
               <Route element={<AppLayout />}>
                 <Route path="/" element={<RootRedirect />} />
 
-                {/* Store & Inventory Domain (ADMIN, STORE_MANAGER, STORE_USER) */}
+                {/* Store & Inventory Domain (STORE_INCHARGE, STORE_MANAGER, STORE_USER) */}
                 <Route
                   element={
                     <ProtectedRoute
-                      allowedRoles={['ADMIN', 'STORE_MANAGER', 'STORE_USER']}
+                      allowedRoles={['STORE_INCHARGE', 'STORE_MANAGER', 'STORE_USER']}
                       workspace="store"
                     />
                   }
                 >
+                  <Route path="/store" element={<DashboardPage />} />
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/store/items" element={<ItemMasterPage />} />
                   <Route path="/store/purchase-orders" element={<POMasterPage />} />
@@ -107,15 +104,16 @@ export const App: React.FC = () => {
                   <Route path="/store/reports" element={<StoreReportsPage />} />
                 </Route>
 
-                {/* Accounts & Finance Domain (ADMIN, ACCOUNT_MANAGER, ACCOUNT_USER) */}
+                {/* Accounts & Finance Domain (ACCOUNT_AND_STORE_INCHARGE, ACCOUNT_MANAGER, ACCOUNT_USER) */}
                 <Route
                   element={
                     <ProtectedRoute
-                      allowedRoles={['ADMIN', 'ACCOUNT_MANAGER', 'ACCOUNT_USER']}
+                      allowedRoles={['ACCOUNT_AND_STORE_INCHARGE', 'ACCOUNT_MANAGER', 'ACCOUNT_USER']}
                       workspace="accounts"
                     />
                   }
                 >
+                  <Route path="/accounts" element={<AccountsDashboardPage />} />
                   <Route path="/accounts/dashboard" element={<AccountsDashboardPage />} />
                   <Route path="/accounts/parties" element={<PartyMasterPage />} />
                   <Route path="/accounts/purchases" element={<PurchaseAccountsPage />} />
@@ -131,18 +129,6 @@ export const App: React.FC = () => {
                   <Route path="/accounts/bank-book" element={<BankBookPage />} />
                   <Route path="/accounts/reports" element={<AccountsReportsPage />} />
                   <Route path="/accounts/settings" element={<AccountSettingsPage />} />
-                </Route>
-
-                {/* Administration Domain (ADMIN only) */}
-                <Route
-                  element={
-                    <ProtectedRoute
-                      allowedRoles={['ADMIN']}
-                      workspace="admin"
-                    />
-                  }
-                >
-                  <Route path="/admin/users" element={<AdminUsersPage />} />
                 </Route>
               </Route>
             </Route>

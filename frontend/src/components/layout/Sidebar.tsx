@@ -40,7 +40,7 @@ interface NavItemConfig {
 
 interface NavSectionConfig {
   title: string;
-  workspace?: 'store' | 'accounts' | 'admin';
+  workspace?: 'store' | 'accounts';
   permission?: string;
   roles?: string[];
   items: NavItemConfig[];
@@ -57,9 +57,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
   const location = useLocation();
   const navigate = useNavigate();
 
-  const userRolesDisplay = user?.roles?.length ? user.roles.join(', ') : user?.role || 'User';
+  const userRolesDisplay = user?.jobTitle || (user?.roles?.length ? user.roles.join(', ') : user?.role || 'User');
   const hasMultipleWorkspaces =
-    (accessibleWorkspaces.store && accessibleWorkspaces.accounts) || accessibleWorkspaces.admin;
+    accessibleWorkspaces.store && accessibleWorkspaces.accounts;
 
   const navSections: NavSectionConfig[] = [
     {
@@ -69,7 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
           ? [
               {
                 name: 'Store Dashboard',
-                path: '/dashboard',
+                path: '/store',
                 icon: LayoutDashboard,
                 permission: 'store.view',
               },
@@ -79,7 +79,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
           ? [
               {
                 name: 'Accounts Dashboard',
-                path: '/accounts/dashboard',
+                path: '/accounts',
                 icon: PieChart,
                 permission: 'accounts.view',
               },
@@ -133,14 +133,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
         { name: 'Cash Book', path: '/accounts/cash-book', icon: DollarSign, permission: 'cash_book.view' },
         { name: 'Bank Book', path: '/accounts/bank-book', icon: Building, permission: 'bank_book.view' },
         { name: 'Accounts Reports', path: '/accounts/reports', icon: BarChart3, permission: 'accounting_reports.view' },
-      ],
-    },
-    {
-      title: 'ADMINISTRATION',
-      workspace: 'admin',
-      roles: ['ADMIN'],
-      items: [
-        { name: 'Users & Access', path: '/admin/users', icon: Shield, permission: 'users.view' },
       ],
     },
   ];
@@ -247,7 +239,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
                     const Icon = item.icon;
                     const isActive =
                       location.pathname === item.path ||
-                      (item.path !== '/dashboard' &&
+                      (item.path === '/store' && (location.pathname === '/store' || location.pathname === '/dashboard')) ||
+                      (item.path === '/accounts' && (location.pathname === '/accounts' || location.pathname === '/accounts/dashboard')) ||
+                      (item.path !== '/store' &&
+                        item.path !== '/dashboard' &&
+                        item.path !== '/accounts' &&
                         item.path !== '/accounts/dashboard' &&
                         location.pathname.startsWith(item.path));
 

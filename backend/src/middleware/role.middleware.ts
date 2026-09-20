@@ -17,12 +17,6 @@ export function requireRoles(allowedRoles: (string | UserRole)[]) {
     }
 
     const userRoles = req.user.roles || [];
-
-    // Admin has universal superuser access
-    if (userRoles.includes('ADMIN')) {
-      return next();
-    }
-
     const hasRole = userRoles.some((role) => allowed.includes(role));
 
     if (!hasRole) {
@@ -52,13 +46,6 @@ export function requirePermissions(requiredPermissions: string | string[], match
       return;
     }
 
-    const userRoles = req.user.roles || [];
-
-    // Admin has universal superuser access
-    if (userRoles.includes('ADMIN')) {
-      return next();
-    }
-
     const userPerms = req.user.permissions || [];
     const hasPermission = matchAll
       ? perms.every((p) => userPerms.includes(p))
@@ -86,13 +73,6 @@ export function requireStoreAccess(req: Request, res: Response, next: NextFuncti
       message: 'Unauthorized: User is not authenticated.',
     });
     return;
-  }
-
-  const userRoles = req.user.roles || [];
-
-  // Admin has access to all stores
-  if (userRoles.includes('ADMIN')) {
-    return next();
   }
 
   const storeId =

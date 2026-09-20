@@ -9,10 +9,9 @@ export interface UserRbacData {
 
 export class RbacService {
   /**
-   * Retrieves all roles and deduplicated permissions assigned to a user.
-   * If user has no userRoles assignments, falls back to their legacy user.role enum.
+   * Retrieves all roles and deduplicated permissions assigned to a user from the database.
    */
-  static async getUserRbacData(userId: string, legacyRole?: string): Promise<UserRbacData> {
+  static async getUserRbacData(userId: string): Promise<UserRbacData> {
     const assignments = await prisma.userRoleAssignment.findMany({
       where: { userId },
       include: {
@@ -28,7 +27,7 @@ export class RbacService {
       },
     });
 
-    let roles: string[] = assignments.map((a) => a.role.name);
+    const roles: string[] = assignments.map((a) => a.role.name);
     const permissionSet = new Set<string>();
 
     if (roles.length > 0) {
@@ -45,13 +44,10 @@ export class RbacService {
 
     const permissions = Array.from(permissionSet).filter(Boolean);
 
-    // Compute accessible workspaces based on roles and permissions
-    const isAdmin = roles.includes('ADMIN');
-    const hasAdminPerm = permissions.some(
-      (p) => p && (p.startsWith('users.') || p.startsWith('roles.') || p.startsWith('audit_logs.') || p.startsWith('system_settings.'))
+    // Dynamic role matching based on database role assignments
+    const hasStoreRole = roles.some((r) =>
+      ['STORE_INCHARGE', 'STORE_MANAGER', 'STORE_USER'].includes(r)
     );
-
-    const hasStoreRole = roles.some((r) => ['ADMIN', 'STORE_MANAGER', 'STORE_USER'].includes(r));
     const hasStorePerm = permissions.some(
       (p) =>
         p.startsWith('store.') ||
@@ -62,7 +58,9 @@ export class RbacService {
         p.startsWith('store_reports.')
     );
 
-    const hasAccountsRole = roles.some((r) => ['ADMIN', 'ACCOUNT_MANAGER', 'ACCOUNT_USER'].includes(r));
+    const hasAccountsRole = roles.some((r) =>
+      ['ACCOUNT_AND_STORE_INCHARGE', 'ACCOUNT_MANAGER', 'ACCOUNT_USER'].includes(r)
+    );
     const hasAccountsPerm = permissions.some(
       (p) =>
         p.startsWith('accounts.') ||
@@ -83,9 +81,8 @@ export class RbacService {
     );
 
     const accessibleWorkspaces: AccessibleWorkspaces = {
-      admin: isAdmin || hasAdminPerm,
-      store: isAdmin || hasStoreRole || hasStorePerm,
-      accounts: isAdmin || hasAccountsRole || hasAccountsPerm,
+      store: hasStoreRole || hasStorePerm,
+      accounts: hasAccountsRole || hasAccountsPerm,
     };
 
     return {

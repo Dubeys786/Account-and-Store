@@ -132,7 +132,7 @@ async function runTests() {
       'STORE_USER accessing Store module is granted with HTTP 200 OK'
     );
 
-    // ADMIN accessing both -> MUST SUCCEED (200)
+    // In two-user system, ADMIN role is decommissioned and blocked from store/accounts modules
     const adminToStoreRes = await fetch(`${baseUrl}/store/items`, {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
@@ -140,8 +140,8 @@ async function runTests() {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
     assert(
-      adminToStoreRes.status === 200 && adminToAccountsRes.status === 200,
-      'ADMIN has full access to both Store and Accounts modules'
+      adminToStoreRes.status === 403 && adminToAccountsRes.status === 403,
+      'ADMIN is blocked from Store and Accounts modules (Admin system removed)'
     );
 
     // TEST 5: Purchase Accounts Workflow Architecture (WITH PO vs WITHOUT PO)

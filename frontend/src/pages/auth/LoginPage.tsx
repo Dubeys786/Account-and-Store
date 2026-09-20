@@ -23,16 +23,17 @@ export const LoginPage: React.FC = () => {
       const { accessibleWorkspaces } = result.user;
       const hasStore = accessibleWorkspaces?.store ?? false;
       const hasAccounts = accessibleWorkspaces?.accounts ?? false;
-      const isAdmin = accessibleWorkspaces?.admin ?? false;
 
-      if (!hasStore && !hasAccounts && !isAdmin) {
+      if (!hasStore && !hasAccounts) {
         navigate('/unassigned');
-      } else if (isAdmin || (hasStore && hasAccounts)) {
-        navigate('/workspace');
-      } else if (hasAccounts && !hasStore) {
-        navigate('/accounts/dashboard');
+      } else if (hasAccounts) {
+        // Accounts landing destination for accounts incharge
+        navigate('/accounts');
+      } else if (hasStore) {
+        // Store landing destination for store incharge
+        navigate('/store');
       } else {
-        navigate('/dashboard');
+        navigate('/unassigned');
       }
     } else {
       setError(result.message || 'Authentication failed. Please check credentials.');

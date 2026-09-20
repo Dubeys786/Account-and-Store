@@ -4,7 +4,13 @@ import { UserRole } from '@prisma/client';
 export interface AccessibleWorkspaces {
   store: boolean;
   accounts: boolean;
-  admin: boolean;
+}
+
+export interface UserProfile {
+  full_name: string;
+  email: string;
+  job_title: string;
+  workspace: string;
 }
 
 export interface AuthUser {
@@ -12,9 +18,12 @@ export interface AuthUser {
   email: string;
   name: string;
   role: UserRole;
+  jobTitle?: string | null;
+  workspace?: string | null;
   roles: string[];
   permissions: string[];
   accessibleWorkspaces: AccessibleWorkspaces;
+  profile?: UserProfile;
   phone?: string | null;
   storeIds: string[];
   defaultStoreId?: string | null;

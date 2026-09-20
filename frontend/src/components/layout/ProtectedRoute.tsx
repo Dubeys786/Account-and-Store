@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
   allowedRoles?: string[];
   requiredPermission?: string;
   requiredPermissions?: string[];
-  workspace?: 'store' | 'accounts' | 'admin';
+  workspace?: 'store' | 'accounts';
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
@@ -37,7 +37,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // If user has zero access to any workspace, send to /unassigned
   const hasAnyWorkspace =
-    accessibleWorkspaces.store || accessibleWorkspaces.accounts || accessibleWorkspaces.admin;
+    accessibleWorkspaces.store || accessibleWorkspaces.accounts;
 
   if (!hasAnyWorkspace && window.location.pathname !== '/unassigned') {
     return <Navigate to="/unassigned" replace />;

@@ -73,10 +73,10 @@ export const WorkspaceSelectorPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
           {/* Card 1: Store & Inventory */}
           <div
-            onClick={() => accessibleWorkspaces.store && navigate('/dashboard')}
+            onClick={() => accessibleWorkspaces.store && navigate('/store')}
             className={`group relative rounded-2xl p-7 flex flex-col justify-between transition-all duration-200 border ${
               accessibleWorkspaces.store
                 ? 'bg-[#0e172e] hover:bg-[#14203f] border-slate-800 hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-600/10 cursor-pointer'
@@ -127,7 +127,7 @@ export const WorkspaceSelectorPage: React.FC = () => {
 
           {/* Card 2: Accounts & Finance */}
           <div
-            onClick={() => accessibleWorkspaces.accounts && navigate('/accounts/dashboard')}
+            onClick={() => accessibleWorkspaces.accounts && navigate('/accounts')}
             className={`group relative rounded-2xl p-7 flex flex-col justify-between transition-all duration-200 border ${
               accessibleWorkspaces.accounts
                 ? 'bg-[#0e172e] hover:bg-[#14203f] border-slate-800 hover:border-emerald-500/50 hover:shadow-2xl hover:shadow-emerald-600/10 cursor-pointer'
@@ -175,39 +175,6 @@ export const WorkspaceSelectorPage: React.FC = () => {
               )}
             </div>
           </div>
-
-          {/* Card 3: Administration & Security */}
-          {accessibleWorkspaces.admin && (
-            <div
-              onClick={() => navigate('/admin/users')}
-              className="group relative rounded-2xl p-7 flex flex-col justify-between transition-all duration-200 border bg-[#0e172e] hover:bg-[#14203f] border-slate-800 hover:border-purple-500/50 hover:shadow-2xl hover:shadow-purple-600/10 cursor-pointer md:col-span-2 lg:col-span-1"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-5">
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-purple-600/20 text-purple-400 group-hover:scale-105 transition-transform">
-                    <Shield className="w-6 h-6" />
-                  </div>
-                  <span className="flex items-center gap-1 text-[11px] font-bold text-purple-400 uppercase tracking-wider bg-purple-950/50 px-2 py-0.5 rounded-full border border-purple-800/40">
-                    <CheckCircle2 className="w-3 h-3" /> Superuser
-                  </span>
-                </div>
-
-                <h3 className="text-xl font-bold text-white mb-2 group-hover:text-purple-400 transition-colors">
-                  Administration
-                </h3>
-                <p className="text-xs text-slate-400 leading-relaxed mb-6">
-                  System User Management, Role Assignments, Permission Matrix Inspection, and Security Audit Logs.
-                </p>
-              </div>
-
-              <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold">
-                <span className="text-slate-500">Control Panel</span>
-                <span className="text-purple-400 group-hover:translate-x-1 transition-transform flex items-center gap-1">
-                  Manage Access <ArrowRight className="w-3.5 h-3.5" />
-                </span>
-              </div>
-            </div>
-          )}
         </div>
       </main>
 

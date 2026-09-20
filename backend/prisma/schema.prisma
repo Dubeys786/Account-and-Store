@@ -100,6 +100,8 @@ model User {
   passwordHash String
   name         String
   role         UserRole    @default(STORE_USER)
+  jobTitle     String?     @map("job_title")
+  workspace    String?     @map("workspace")
   phone        String?
   isActive     Boolean     @default(true)
   createdAt    DateTime    @default(now())
@@ -108,8 +110,24 @@ model User {
   storeUsers   StoreUser[]
   userRoles    UserRoleAssignment[]
   auditLogs    AuditLog[]
+  profile      Profile?
 
   @@map("users")
+}
+
+model Profile {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  fullName  String   @map("full_name")
+  email     String
+  jobTitle  String   @map("job_title")
+  workspace String   @map("workspace")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
 }
 
 model Role {

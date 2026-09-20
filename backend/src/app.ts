@@ -7,7 +7,6 @@ import healthRoutes from './modules/health/health.routes';
 import authRoutes from './modules/auth/auth.routes';
 import storeRoutes from './modules/store/store.routes';
 import accountsRoutes from './modules/accounts/accounts.routes';
-import adminRoutes from './modules/admin/admin.routes';
 import { errorHandler } from './middleware/error.middleware';
 
 export const app = express();
@@ -50,7 +49,6 @@ app.use('/api/v1/health', healthRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/store', storeRoutes);
 app.use('/api/v1/accounts', accountsRoutes);
-app.use('/api/v1/admin', adminRoutes);
 
 // Root fallback
 app.get('/', (_req, res) => {

@@ -22,7 +22,7 @@ export const AccessNotAssignedPage: React.FC = () => {
   };
 
   // If user already has access, redirect them to workspace
-  if (accessibleWorkspaces.store || accessibleWorkspaces.accounts || accessibleWorkspaces.admin) {
+  if (accessibleWorkspaces.store || accessibleWorkspaces.accounts) {
     navigate('/workspace');
     return null;
   }
