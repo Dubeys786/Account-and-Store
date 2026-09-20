@@ -1,6 +1,7 @@
 import { UserRole, PartyType, AccountGroup, BalanceType, PartyStatus, POStatus } from '@prisma/client';
 import { prisma, initDatabase } from '../src/config/db';
 import bcrypt from 'bcryptjs';
+import { seedRbacSystem } from '../src/config/rbac-seed';
 
 export async function seedDatabase() {
   console.log('🌱 Starting database seeding for PROZEN Store & Accounts...');
@@ -560,6 +561,9 @@ export async function seedDatabase() {
   }
 
   console.log('✅ Payments, Receipts, Expenses, and Income records seeded');
+
+  // Seed RBAC Roles, Permissions, and default User assignments
+  await seedRbacSystem();
 
   console.log('🎉 PROZEN Store & Accounts database seeding completed successfully!');
 }

@@ -224,6 +224,71 @@ export async function initDatabase(): Promise<void> {
     } catch (e: any) {
       console.warn('Phase 8 schema column check:', e.message || e);
     }
+
+    // RBAC System: Ensure roles, permissions, role_permissions, user_roles tables exist
+    try {
+      const roleTableRes = await pglite.query<{ count: string }>(
+        "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'roles'"
+      );
+      const roleTableCount = parseInt(roleTableRes.rows[0]?.count || '0', 10);
+
+      if (roleTableCount === 0) {
+        console.log('📦 Executing RBAC migration into storage engine...');
+        const rbacCandidates = [
+          path.resolve(__dirname, '../../prisma/migrations/20260920000000_rbac_system/migration.sql'),
+          path.resolve(process.cwd(), 'prisma/migrations/20260920000000_rbac_system/migration.sql'),
+        ];
+        const rbacFile = rbacCandidates.find((p) => fs.existsSync(p));
+
+        if (rbacFile) {
+          let ddl = fs.readFileSync(rbacFile, 'utf-8');
+          if (ddl.charCodeAt(0) === 0xfeff) {
+            ddl = ddl.slice(1);
+          }
+          await pglite.exec(ddl);
+          console.log('✅ RBAC schema (roles, permissions, role_permissions, user_roles) applied successfully!');
+        } else {
+          // Direct fallback execution
+          await pglite.exec(`
+            CREATE TABLE IF NOT EXISTS "roles" (
+              "id" TEXT PRIMARY KEY,
+              "name" TEXT NOT NULL UNIQUE,
+              "description" TEXT,
+              "isSystem" BOOLEAN NOT NULL DEFAULT false,
+              "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS "permissions" (
+              "id" TEXT PRIMARY KEY,
+              "name" TEXT NOT NULL UNIQUE,
+              "module" TEXT NOT NULL,
+              "description" TEXT,
+              "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS "role_permissions" (
+              "id" TEXT PRIMARY KEY,
+              "roleId" TEXT NOT NULL REFERENCES "roles"("id") ON DELETE CASCADE,
+              "permissionId" TEXT NOT NULL REFERENCES "permissions"("id") ON DELETE CASCADE,
+              "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE ("roleId", "permissionId")
+            );
+            CREATE TABLE IF NOT EXISTS "user_roles" (
+              "id" TEXT PRIMARY KEY,
+              "userId" TEXT NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+              "roleId" TEXT NOT NULL REFERENCES "roles"("id") ON DELETE CASCADE,
+              "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE ("userId", "roleId")
+            );
+            ALTER TABLE "store_users" ADD COLUMN IF NOT EXISTS "accessLevel" TEXT NOT NULL DEFAULT 'FULL';
+            ALTER TABLE "store_users" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN NOT NULL DEFAULT true;
+          `);
+          console.log('✅ RBAC schema applied via fallback DDL execution.');
+        }
+      }
+    } catch (e: any) {
+      console.warn('RBAC schema migration check:', e.message || e);
+    }
   } catch (err: any) {
     console.error('❌ Database bootstrap error:', err.message || err);
     throw err;

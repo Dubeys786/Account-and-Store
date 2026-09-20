@@ -14,15 +14,16 @@ import { preventParameterTampering } from '../../middleware/security.middleware'
 
 const router = Router();
 
-// Store modules are strictly accessible by ADMIN and STORE_USER only. ACCOUNT_USER is forbidden.
-router.use(authenticate, preventParameterTampering, requireRoles([UserRole.ADMIN, UserRole.STORE_USER]));
+// Store modules are strictly accessible by ADMIN, STORE_MANAGER, and STORE_USER. ACCOUNT_USER is forbidden.
+router.use(authenticate, preventParameterTampering, requireRoles(['ADMIN', 'STORE_MANAGER', 'STORE_USER']));
 
 // Lookup endpoints for forms (scoped to authorized stores for non-admin)
 router.get('/stores', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = req.user!;
+    const isAdmin = user.roles?.includes('ADMIN') || user.role === UserRole.ADMIN;
     const where: any = { isActive: true };
-    if (user.role !== UserRole.ADMIN && user.storeIds?.length) {
+    if (!isAdmin && user.storeIds?.length) {
       where.id = { in: user.storeIds };
     }
     const stores = await prisma.store.findMany({

@@ -20,15 +20,9 @@ async function startServer() {
       logger.info(`✅ Database ready with ${userCount} registered system users.`);
     }
 
-    // Ensure account@prozen.com is scoped strictly to mainStore (STR-001) for tenancy isolation
-    const accUser = await prisma.user.findUnique({ where: { email: 'account@prozen.com' } });
-    const brStore = await prisma.store.findUnique({ where: { code: 'STR-002' } });
-    if (accUser && brStore) {
-      await prisma.storeUser.deleteMany({
-        where: { userId: accUser.id, storeId: brStore.id },
-      });
-      logger.info('🔒 Enforced single-store tenancy for account@prozen.com (STR-001 only).');
-    }
+    // 3. Ensure RBAC roles and permissions exist in database
+    const { seedRbacSystem } = await import('./config/rbac-seed');
+    await seedRbacSystem();
 
     // 3. Start Express HTTP Server
     const server = app.listen(env.PORT, () => {

@@ -1,0 +1,38 @@
+-- RBAC System Migration: Roles, Permissions, RolePermissions, and UserRoles
+
+CREATE TABLE IF NOT EXISTS "roles" (
+  "id" TEXT PRIMARY KEY,
+  "name" TEXT NOT NULL UNIQUE,
+  "description" TEXT,
+  "isSystem" BOOLEAN NOT NULL DEFAULT false,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS "permissions" (
+  "id" TEXT PRIMARY KEY,
+  "name" TEXT NOT NULL UNIQUE,
+  "module" TEXT NOT NULL,
+  "description" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS "role_permissions" (
+  "id" TEXT PRIMARY KEY,
+  "roleId" TEXT NOT NULL REFERENCES "roles"("id") ON DELETE CASCADE,
+  "permissionId" TEXT NOT NULL REFERENCES "permissions"("id") ON DELETE CASCADE,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE ("roleId", "permissionId")
+);
+
+CREATE TABLE IF NOT EXISTS "user_roles" (
+  "id" TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+  "roleId" TEXT NOT NULL REFERENCES "roles"("id") ON DELETE CASCADE,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE ("userId", "roleId")
+);
+
+ALTER TABLE "store_users" ADD COLUMN IF NOT EXISTS "accessLevel" TEXT NOT NULL DEFAULT 'FULL';
+ALTER TABLE "store_users" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN NOT NULL DEFAULT true;

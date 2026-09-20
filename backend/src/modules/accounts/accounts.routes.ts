@@ -24,9 +24,9 @@ import { AuditService } from '../audit/audit.service';
 
 const router = Router();
 
-// Accounts modules are strictly accessible by ADMIN and ACCOUNT_USER only.
+// Accounts modules are strictly accessible by ADMIN, ACCOUNT_MANAGER, and ACCOUNT_USER.
 // STORE_USER is strictly FORBIDDEN to access these routes!
-router.use(authenticate, preventParameterTampering, requireRoles([UserRole.ADMIN, UserRole.ACCOUNT_USER]));
+router.use(authenticate, preventParameterTampering, requireRoles(['ADMIN', 'ACCOUNT_MANAGER', 'ACCOUNT_USER']));
 
 // ==========================================
 // 1. DASHBOARD & METRICS

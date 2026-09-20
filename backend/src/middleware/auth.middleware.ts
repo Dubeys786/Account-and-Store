@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import env from '../config/env';
 import prisma from '../config/db';
 import { AuthUser } from '../types';
+import { RbacService } from '../services/rbac.service';
 
 interface JwtPayload {
   userId: string;
@@ -53,11 +54,16 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
     const defaultStore = user.storeUsers.find((su) => su.isDefault);
 
+    const rbacData = await RbacService.getUserRbacData(user.id, user.role);
+
     const authUser: AuthUser = {
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
+      roles: rbacData.roles,
+      permissions: rbacData.permissions,
+      accessibleWorkspaces: rbacData.accessibleWorkspaces,
       phone: user.phone,
       storeIds: user.storeUsers.map((su) => su.storeId),
       defaultStoreId: defaultStore ? defaultStore.storeId : user.storeUsers[0]?.storeId || null,

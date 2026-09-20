@@ -1,11 +1,20 @@
 import { Request } from 'express';
 import { UserRole } from '@prisma/client';
 
+export interface AccessibleWorkspaces {
+  store: boolean;
+  accounts: boolean;
+  admin: boolean;
+}
+
 export interface AuthUser {
   id: string;
   email: string;
   name: string;
   role: UserRole;
+  roles: string[];
+  permissions: string[];
+  accessibleWorkspaces: AccessibleWorkspaces;
   phone?: string | null;
   storeIds: string[];
   defaultStoreId?: string | null;
