@@ -198,14 +198,14 @@ export class ReportsService {
 
       let rows = ledgerResult.entries.map((entry) => ({
         id: entry.id,
-        date: entry.entryDate,
+        date: entry.date,
         partyName: ledgerResult.party.name,
-        voucherNumber: entry.entryNumber,
+        voucherNumber: entry.voucherNumber,
         reference: entry.referenceType || 'JOURNAL',
-        particulars: entry.narration,
-        debit: entry.debitAmount,
-        credit: entry.creditAmount,
-        balance: entry.runningBalanceFormatted,
+        particulars: entry.particulars,
+        debit: entry.debit,
+        credit: entry.credit,
+        balance: entry.formattedBalance,
       }));
 
       if (options.search) {
@@ -230,10 +230,10 @@ export class ReportsService {
         columns,
         records: paginated,
         summary: {
-          openingBalance: ledgerResult.summary.openingBalanceFormatted,
-          totalDebit: ledgerResult.summary.totalDebit,
-          totalCredit: ledgerResult.summary.totalCredit,
-          closingBalance: ledgerResult.summary.closingBalanceFormatted,
+          openingBalance: ledgerResult.openingBalance.formatted,
+          totalDebit: ledgerResult.totalDebit,
+          totalCredit: ledgerResult.totalCredit,
+          closingBalance: ledgerResult.closingBalance.formatted,
           partyName: ledgerResult.party.name,
           partyCode: ledgerResult.party.code,
         },

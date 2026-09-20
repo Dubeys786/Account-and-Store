@@ -276,7 +276,7 @@ async function runPhase11E2EValidation() {
     headers: { Authorization: `Bearer ${accountAuth.token}` },
   });
   const payablesJson = (await payablesRes.json()) as ApiResponse;
-  const payableItem = payablesJson.data?.find((p: any) => p.invoiceNumber === invoiceNumWithPO);
+  const payableItem = payablesJson.data?.find((p: any) => (p.invoice || p.invoiceNumber) === invoiceNumWithPO);
 
   assert(payableItem && payableItem.outstanding > 0, `Payable record verified with outstanding balance ₹${payableItem?.outstanding}`);
 
@@ -401,8 +401,8 @@ async function runPhase11E2EValidation() {
   let allLinesMathValid = true;
 
   for (const entry of ledgerObj.entries) {
-    const debit = Number(entry.debitAmount || 0);
-    const credit = Number(entry.creditAmount || 0);
+    const debit = Number(entry.debit || entry.debitAmount || 0);
+    const credit = Number(entry.credit || entry.creditAmount || 0);
     totalDebit += debit;
     totalCredit += credit;
 
@@ -410,15 +410,18 @@ async function runPhase11E2EValidation() {
     computedRunning += (credit - debit);
   }
 
-  const closingBalance = ledgerObj.summary?.closingBalance;
+  const expectedDebit = ledgerObj.totalDebit ?? ledgerObj.summary?.totalDebit;
+  const expectedCredit = ledgerObj.totalCredit ?? ledgerObj.summary?.totalCredit;
+  const closingBalance = ledgerObj.closingBalance?.formatted || ledgerObj.closingBalance;
+
   assert(allLinesMathValid, `Every single ledger row running balance mathematically valid`);
   assert(
-    Math.abs(totalDebit - ledgerObj.summary?.totalDebit) < 0.01,
-    `Total Debits sum match (Computed: ₹${totalDebit.toFixed(2)}, Ledger: ₹${ledgerObj.summary?.totalDebit})`
+    Math.abs(totalDebit - expectedDebit) < 0.01,
+    `Total Debits sum match (Computed: ₹${totalDebit.toFixed(2)}, Ledger: ₹${expectedDebit})`
   );
   assert(
-    Math.abs(totalCredit - ledgerObj.summary?.totalCredit) < 0.01,
-    `Total Credits sum match (Computed: ₹${totalCredit.toFixed(2)}, Ledger: ₹${ledgerObj.summary?.totalCredit})`
+    Math.abs(totalCredit - expectedCredit) < 0.01,
+    `Total Credits sum match (Computed: ₹${totalCredit.toFixed(2)}, Ledger: ₹${expectedCredit})`
   );
   console.log(`  Closing Balance Verified: ${closingBalance} (Total Debits: ₹${totalDebit.toFixed(2)}, Total Credits: ₹${totalCredit.toFixed(2)})`);
 
