@@ -1,17 +1,65 @@
-import React from 'react';
-import { BarChart3, Download, ArrowUpRight } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { BarChart3, Download, ArrowUpRight, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import apiRequest from '../../services/api';
+
+interface ReportMeta {
+  title: string;
+  desc: string;
+  category: string;
+}
+
+const defaultReportDescriptions: Record<string, { desc: string; category: string }> = {
+  'Trial Balance': {
+    desc: 'Summary of all general ledger debit and credit totals verifying double-entry equilibrium',
+    category: 'Statutory Accounting',
+  },
+  'Profit & Loss Statement': {
+    desc: 'Trading and income statement showing gross margin, operating expenditure, and net profit',
+    category: 'Management Financials',
+  },
+  'Balance Sheet': {
+    desc: 'Statement of financial position showing total assets, liabilities, and owners equity',
+    category: 'Statutory Accounting',
+  },
+  'GST GSTR-2B Reconciliation': {
+    desc: 'Reconcile supplier purchase bills with government GST portal input tax credits',
+    category: 'Tax & Compliance',
+  },
+  'Party Outstanding Aging': {
+    desc: 'Comprehensive customer and supplier aging schedule by credit days elapsed',
+    category: 'Audit & Liquidity',
+  },
+};
 
 export const AccountsReportsPage: React.FC = () => {
-  const reports = [
-    { title: 'Trial Balance', desc: 'Summary of all general ledger debit and credit totals verifying double-entry equilibrium' },
-    { title: 'Profit & Loss Statement', desc: 'Trading and income statement showing gross margin and net operating profit' },
-    { title: 'Balance Sheet', desc: 'Statement of financial position showing total assets, liabilities, and owners equity' },
-    { title: 'GST GSTR-2B Reconciliation', desc: 'Reconcile supplier purchase bills with government GST portal input tax credits' },
-    { title: 'Party Outstanding Aging', desc: 'Comprehensive customer and supplier aging schedule by credit days elapsed' },
-    { title: 'Cash Flow Statement', desc: 'Operational, investing, and financing cash flow movement summary' },
-  ];
+  const [reportsList, setReportsList] = useState<ReportMeta[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchReports = async () => {
+    setLoading(true);
+    const res = await apiRequest<{ availableReports: string[] }>('/accounts/reports');
+    if (res.success && res.data?.availableReports) {
+      const items: ReportMeta[] = res.data.availableReports.map((title) => ({
+        title,
+        desc:
+          defaultReportDescriptions[title]?.desc ||
+          'Automated real-time financial report generated from double-entry general ledger records',
+        category: defaultReportDescriptions[title]?.category || 'Financial Statements',
+      }));
+      setReportsList(items);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchReports();
+  }, []);
+
+  const handleExportPDF = (title: string) => {
+    window.print();
+  };
 
   return (
     <div className="space-y-6">
@@ -27,33 +75,60 @@ export const AccountsReportsPage: React.FC = () => {
             Statutory financial statements, tax reconciliation reports, and management balance summaries
           </p>
         </div>
+        <div className="flex items-center gap-2.5">
+          <Button
+            size="sm"
+            variant="outline"
+            icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />}
+            onClick={fetchReports}
+          >
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {reports.map((report) => (
-          <Card key={report.title} className="hover:border-slate-300 transition-colors">
-            <CardHeader>
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                  <BarChart3 className="w-4 h-4" />
+        {loading ? (
+          <div className="col-span-3 text-center py-12 text-slate-400">
+            <RefreshCw className="w-5 h-5 animate-spin mx-auto text-blue-600 mb-2" />
+            <span>Loading available reports catalog from server...</span>
+          </div>
+        ) : (
+          reportsList.map((report) => (
+            <Card key={report.title} className="hover:border-slate-300 transition-colors shadow-2xs">
+              <CardHeader>
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                    <BarChart3 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm">{report.title}</CardTitle>
+                    <span className="text-[10px] text-slate-400 font-medium">{report.category}</span>
+                  </div>
                 </div>
-                <CardTitle className="text-sm">{report.title}</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-slate-500 mb-4">{report.desc}</p>
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                <Button size="sm" variant="secondary" icon={<ArrowUpRight className="w-3.5 h-3.5" />}>
-                  View Report
-                </Button>
-                <Button size="sm" variant="outline" icon={<Download className="w-3.5 h-3.5" />}>
-                  PDF
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-slate-500 mb-4 leading-relaxed">{report.desc}</p>
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                  <span className="flex items-center gap-1 text-[11px] text-emerald-600 font-semibold">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> API Connected
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    icon={<Download className="w-3.5 h-3.5" />}
+                    onClick={() => handleExportPDF(report.title)}
+                  >
+                    Export Statement
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );
 };
+
+export default AccountsReportsPage;

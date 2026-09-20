@@ -25,6 +25,7 @@ import {
   Shield,
   LogOut,
   Building2,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useStore } from '../../context/StoreContext';
@@ -43,7 +44,12 @@ interface NavSectionConfig {
   roles?: UserRole[];
 }
 
-export const Sidebar: React.FC = () => {
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) => {
   const { user, logout } = useAuth();
   const { activeStore } = useStore();
   const location = useLocation();
@@ -96,8 +102,7 @@ export const Sidebar: React.FC = () => {
         { name: 'Day Book', path: '/accounts/day-book', icon: Calendar, roles: ['ADMIN', 'ACCOUNT_USER'] },
         { name: 'Cash Book', path: '/accounts/cash-book', icon: DollarSign, roles: ['ADMIN', 'ACCOUNT_USER'] },
         { name: 'Bank Book', path: '/accounts/bank-book', icon: Building, roles: ['ADMIN', 'ACCOUNT_USER'] },
-        { name: 'Accounting Reports', path: '/accounts/reports', icon: BarChart3, roles: ['ADMIN', 'ACCOUNT_USER'] },
-        { name: 'Account Settings', path: '/accounts/settings', icon: Settings, roles: ['ADMIN', 'ACCOUNT_USER'] },
+        { name: 'Reports', path: '/accounts/reports', icon: BarChart3, roles: ['ADMIN', 'ACCOUNT_USER'] },
       ],
     },
   ];
@@ -105,22 +110,46 @@ export const Sidebar: React.FC = () => {
   const userRole = user?.role || 'STORE_USER';
 
   return (
-    <aside className="w-64 bg-[#0b132a] text-slate-300 flex flex-col shrink-0 h-screen sticky top-0 select-none border-r border-slate-800 shadow-xl z-30">
-      {/* Brand Header */}
-      <div className="h-16 px-5 flex items-center gap-3 border-b border-slate-800/80 bg-[#080e21]">
-        <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-600/30">
-          P
+    <>
+      {/* Mobile Backdrop */}
+      {mobileOpen && (
+        <div
+          onClick={onCloseMobile}
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 lg:hidden transition-opacity"
+        />
+      )}
+
+      {/* Main Sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 lg:static lg:z-30 w-64 bg-[#0b132a] text-slate-300 flex flex-col shrink-0 h-screen select-none border-r border-slate-800 shadow-xl transition-transform duration-200 ease-in-out ${
+          mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+        {/* Brand Header */}
+        <div className="h-16 px-5 flex items-center justify-between border-b border-slate-800/80 bg-[#080e21]">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-600/30">
+              P
+            </div>
+            <div className="flex flex-col">
+              <span className="text-base font-bold text-white tracking-wider flex items-center gap-1.5">
+                PROZEN
+                <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.2 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded">
+                  ERP
+                </span>
+              </span>
+              <span className="text-xs font-medium text-slate-400">Store & Accounts</span>
+            </div>
+          </div>
+          {/* Mobile Close Button */}
+          <button
+            onClick={onCloseMobile}
+            className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            aria-label="Close sidebar"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
-        <div className="flex flex-col">
-          <span className="text-base font-bold text-white tracking-wider flex items-center gap-1.5">
-            PROZEN
-            <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.2 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded">
-              ERP
-            </span>
-          </span>
-          <span className="text-xs font-medium text-slate-400">Store & Accounts</span>
-        </div>
-      </div>
 
       {/* Active Store Indicator */}
       {activeStore && (
@@ -167,6 +196,7 @@ export const Sidebar: React.FC = () => {
                     <NavLink
                       key={item.path}
                       to={item.path}
+                      onClick={onCloseMobile}
                       className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150 ${
                         isActive
                           ? 'bg-blue-600 text-white font-semibold shadow-sm shadow-blue-500/30'
@@ -219,5 +249,6 @@ export const Sidebar: React.FC = () => {
         </div>
       </div>
     </aside>
+    </>
   );
 };

@@ -11,6 +11,11 @@ import { errorHandler } from './middleware/error.middleware';
 
 export const app = express();
 
+// Pretty-print JSON responses in development for readability
+if (env.NODE_ENV === 'development') {
+  app.set('json spaces', 2);
+}
+
 // Security middlewares
 app.use(helmet());
 app.use(

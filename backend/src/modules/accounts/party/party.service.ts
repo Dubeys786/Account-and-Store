@@ -1,6 +1,7 @@
 import prisma from '../../../config/db';
 import { PartyStatus, PartyType, BalanceType, Prisma } from '@prisma/client';
 import { CreatePartyDTO, UpdatePartyDTO, PartyQueryFilters, PaginatedPartiesResult } from './party.types';
+import { LedgerService } from '../ledger/ledger.service';
 
 export class PartyService {
   /**
@@ -152,8 +153,30 @@ export class PartyService {
       }),
     ]);
 
+    const partiesWithBalance = await Promise.all(
+      parties.map(async (party) => {
+        try {
+          const bal = await LedgerService.getPartyBalance(party.id);
+          return {
+            ...party,
+            balance: bal.currentBalance.amount,
+            balanceType: bal.currentBalance.type,
+            formattedBalance: bal.formattedBalance,
+          };
+        } catch {
+          const bType = party.openingBalanceType || BalanceType.DEBIT;
+          return {
+            ...party,
+            balance: Number(party.openingBalance || 0),
+            balanceType: bType,
+            formattedBalance: `₹ ${Number(party.openingBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} ${bType === 'DEBIT' ? 'Dr' : 'Cr'}`,
+          };
+        }
+      })
+    );
+
     return {
-      parties,
+      parties: partiesWithBalance,
       pagination: {
         total,
         page,
@@ -178,7 +201,23 @@ export class PartyService {
       throw new Error(`Party with ID '${id}' not found.`);
     }
 
-    return party;
+    try {
+      const bal = await LedgerService.getPartyBalance(party.id);
+      return {
+        ...party,
+        balance: bal.currentBalance.amount,
+        balanceType: bal.currentBalance.type,
+        formattedBalance: bal.formattedBalance,
+      };
+    } catch {
+      const bType = party.openingBalanceType || BalanceType.DEBIT;
+      return {
+        ...party,
+        balance: Number(party.openingBalance || 0),
+        balanceType: bType,
+        formattedBalance: `₹ ${Number(party.openingBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} ${bType === 'DEBIT' ? 'Dr' : 'Cr'}`,
+      };
+    }
   }
 
   /**

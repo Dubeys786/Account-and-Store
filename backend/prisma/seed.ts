@@ -1,4 +1,4 @@
-import { UserRole, PartyType, AccountGroup, BalanceType, PartyStatus } from '@prisma/client';
+import { UserRole, PartyType, AccountGroup, BalanceType, PartyStatus, POStatus } from '@prisma/client';
 import { prisma, initDatabase } from '../src/config/db';
 import bcrypt from 'bcryptjs';
 
@@ -234,6 +234,332 @@ export async function seedDatabase() {
   }
 
   console.log(`✅ Items seeded (${items.length} items)`);
+
+  // 5.1 Seed Purchase Orders & Material Inwards
+  const itm1 = await prisma.item.findUnique({ where: { code: 'ITM-001' } });
+  const itm2 = await prisma.item.findUnique({ where: { code: 'ITM-002' } });
+  const itm3 = await prisma.item.findUnique({ where: { code: 'ITM-003' } });
+  const sup1 = await prisma.party.findUnique({ where: { code: 'PRT-SUP-001' } });
+  const sup2 = await prisma.party.findUnique({ where: { code: 'PRT-SUP-002' } });
+
+  if (sup1 && itm1 && itm2 && mainStore) {
+    // PO 1: Partially Received against Bharat Steel
+    const po1 = await prisma.purchaseOrder.upsert({
+      where: { poNumber: 'PO-2026-0001' },
+      update: {},
+      create: {
+        poNumber: 'PO-2026-0001',
+        poDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+        partyId: sup1.id,
+        storeId: mainStore.id,
+        status: POStatus.PARTIALLY_RECEIVED,
+        subtotal: 41500,
+        discount: 1200,
+        taxAmount: 7254,
+        totalAmount: 47554,
+        notes: 'Monthly bulk steel beams & ball bearings requisition',
+        items: {
+          create: [
+            {
+              itemId: itm1.id,
+              quantity: 20,
+              rate: 1200,
+              discountPercent: 5,
+              taxPercent: 18,
+              total: 26904,
+              receivedQty: 15,
+            },
+            {
+              itemId: itm2.id,
+              quantity: 50,
+              rate: 350,
+              discountPercent: 0,
+              taxPercent: 18,
+              total: 20650,
+              receivedQty: 50,
+            },
+          ],
+        },
+      },
+    });
+
+    // Material Inward 1 for PO 1
+    await prisma.materialInward.upsert({
+      where: { inwardNumber: 'INW-2026-0001' },
+      update: {},
+      create: {
+        inwardNumber: 'INW-2026-0001',
+        inwardDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+        poId: po1.id,
+        partyId: sup1.id,
+        storeId: mainStore.id,
+        referenceNumber: 'CHALLAN-BS-9812',
+        remarks: 'Physical inspection passed. Accepted 15 beams and 50 bearings.',
+        items: {
+          create: [
+            {
+              itemId: itm1.id,
+              receivedQty: 15,
+              rejectedQty: 0,
+              acceptedQty: 15,
+              rate: 1200,
+              remarks: '15/20 structural steel beams received in prime condition',
+            },
+            {
+              itemId: itm2.id,
+              receivedQty: 50,
+              rejectedQty: 0,
+              acceptedQty: 50,
+              rate: 350,
+              remarks: 'All 50 ball bearings verified & accepted',
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  if (sup2 && itm3 && mainStore) {
+    // PO 2: Fully Received against Apex Lubricants
+    const po2 = await prisma.purchaseOrder.upsert({
+      where: { poNumber: 'PO-2026-0002' },
+      update: {},
+      create: {
+        poNumber: 'PO-2026-0002',
+        poDate: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
+        partyId: sup2.id,
+        storeId: mainStore.id,
+        status: POStatus.RECEIVED,
+        subtotal: 45000,
+        discount: 4500,
+        taxAmount: 7290,
+        totalAmount: 47790,
+        notes: 'High-performance synthetic gear oil replenishment',
+        items: {
+          create: [
+            {
+              itemId: itm3.id,
+              quantity: 10,
+              rate: 4500,
+              discountPercent: 10,
+              taxPercent: 18,
+              total: 47790,
+              receivedQty: 10,
+            },
+          ],
+        },
+      },
+    });
+
+    // Material Inward 2 for PO 2
+    await prisma.materialInward.upsert({
+      where: { inwardNumber: 'INW-2026-0002' },
+      update: {},
+      create: {
+        inwardNumber: 'INW-2026-0002',
+        inwardDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+        poId: po2.id,
+        partyId: sup2.id,
+        storeId: mainStore.id,
+        referenceNumber: 'INV-APEX-4410',
+        remarks: 'All 10 barrels QC tested and stored in Hazardous Chemicals bay',
+        items: {
+          create: [
+            {
+              itemId: itm3.id,
+              receivedQty: 10,
+              rejectedQty: 0,
+              acceptedQty: 10,
+              rate: 4500,
+              remarks: 'Grade ISO VG 220 certified',
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  if (sup1 && itm2 && branchStore) {
+    // PO 3: Approved (Awaiting Inward) in North Regional Warehouse
+    await prisma.purchaseOrder.upsert({
+      where: { poNumber: 'PO-2026-0003' },
+      update: {},
+      create: {
+        poNumber: 'PO-2026-0003',
+        poDate: new Date(),
+        partyId: sup1.id,
+        storeId: branchStore.id,
+        status: POStatus.APPROVED,
+        subtotal: 10800,
+        discount: 0,
+        taxAmount: 1944,
+        totalAmount: 12744,
+        notes: 'Regional warehouse backup maintenance stock',
+        items: {
+          create: [
+            {
+              itemId: itm2.id,
+              quantity: 30,
+              rate: 360,
+              discountPercent: 0,
+              taxPercent: 18,
+              total: 12744,
+              receivedQty: 0,
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  console.log('✅ Purchase Orders and Material Inwards seeded');
+
+  // 6. Seed Payments, Receipts, Expenses, and Income
+  const bankAccount = await prisma.ledgerAccount.findUnique({ where: { code: '1020' } });
+  const cashAccount = await prisma.ledgerAccount.findUnique({ where: { code: '1010' } });
+  const rentAccount = await prisma.ledgerAccount.findUnique({ where: { code: '5020' } });
+  const salesAccount = await prisma.ledgerAccount.findUnique({ where: { code: '4010' } });
+  const supplier1 = await prisma.party.findUnique({ where: { code: 'PRT-SUP-001' } });
+  const supplier2 = await prisma.party.findUnique({ where: { code: 'PRT-SUP-002' } });
+  const customer1 = await prisma.party.findUnique({ where: { code: 'PRT-CUS-001' } });
+
+  const today = new Date();
+
+  // Payments
+  if (bankAccount && supplier1) {
+    await prisma.payment.upsert({
+      where: { paymentNumber: 'PAY-2026-001' },
+      update: {},
+      create: {
+        paymentNumber: 'PAY-2026-001',
+        paymentDate: today,
+        partyId: supplier1.id,
+        accountId: bankAccount.id,
+        amount: 85000,
+        paymentMode: 'BANK_TRANSFER',
+        referenceNo: 'HDFC-NEFT-984210',
+        notes: "Part payment against raw material procurement invoice",
+      },
+    });
+  }
+
+  if (cashAccount && supplier2) {
+    await prisma.payment.upsert({
+      where: { paymentNumber: 'PAY-2026-002' },
+      update: {},
+      create: {
+        paymentNumber: 'PAY-2026-002',
+        paymentDate: today,
+        partyId: supplier2.id,
+        accountId: cashAccount.id,
+        amount: 25000,
+        paymentMode: 'CASH',
+        referenceNo: 'CASH-VCH-104',
+        notes: "Immediate cash settlement for lubricant delivery",
+      },
+    });
+  }
+
+  // Receipts
+  if (bankAccount && customer1) {
+    await prisma.receipt.upsert({
+      where: { receiptNumber: 'REC-2026-001' },
+      update: {},
+      create: {
+        receiptNumber: 'REC-2026-001',
+        receiptDate: today,
+        partyId: customer1.id,
+        accountId: bankAccount.id,
+        amount: 145000,
+        paymentMode: 'BANK_TRANSFER',
+        referenceNo: 'AXIS-RTGS-772911',
+        notes: "Client advance for structural beam order",
+      },
+    });
+
+    await prisma.receipt.upsert({
+      where: { receiptNumber: 'REC-2026-002' },
+      update: {},
+      create: {
+        receiptNumber: 'REC-2026-002',
+        receiptDate: today,
+        partyId: customer1.id,
+        accountId: bankAccount.id,
+        amount: 65000,
+        paymentMode: 'CHEQUE',
+        referenceNo: 'CHQ-882190',
+        notes: "Milestone completion payment",
+      },
+    });
+  }
+
+  // Expenses
+  if (rentAccount && mainStore) {
+    await prisma.expense.upsert({
+      where: { expenseNumber: 'EXP-2026-001' },
+      update: {},
+      create: {
+        expenseNumber: 'EXP-2026-001',
+        expenseDate: today,
+        storeId: mainStore.id,
+        accountId: rentAccount.id,
+        amount: 42000,
+        paymentMode: 'BANK_TRANSFER',
+        category: 'RENT',
+        description: 'Monthly industrial warehouse lease payment',
+      },
+    });
+
+    await prisma.expense.upsert({
+      where: { expenseNumber: 'EXP-2026-002' },
+      update: {},
+      create: {
+        expenseNumber: 'EXP-2026-002',
+        expenseDate: today,
+        storeId: mainStore.id,
+        accountId: rentAccount.id,
+        amount: 8500,
+        paymentMode: 'CASH',
+        category: 'UTILITIES',
+        description: 'Electricity, water and high-speed fiber internet charges',
+      },
+    });
+  }
+
+  // Income
+  if (salesAccount && mainStore) {
+    await prisma.income.upsert({
+      where: { incomeNumber: 'INC-2026-001' },
+      update: {},
+      create: {
+        incomeNumber: 'INC-2026-001',
+        incomeDate: today,
+        storeId: mainStore.id,
+        accountId: salesAccount.id,
+        amount: 98000,
+        paymentMode: 'BANK_TRANSFER',
+        category: 'CONSULTING_SALES',
+        description: 'Engineering fabrication consultancy and material handling advisory',
+      },
+    });
+
+    await prisma.income.upsert({
+      where: { incomeNumber: 'INC-2026-002' },
+      update: {},
+      create: {
+        incomeNumber: 'INC-2026-002',
+        incomeDate: today,
+        storeId: mainStore.id,
+        accountId: salesAccount.id,
+        amount: 24000,
+        paymentMode: 'UPI',
+        category: 'SCRAP_SALE',
+        description: 'Secondary steel offcut and empty barrel scrap disposal',
+      },
+    });
+  }
+
+  console.log('✅ Payments, Receipts, Expenses, and Income records seeded');
 
   console.log('🎉 PROZEN Store & Accounts database seeding completed successfully!');
 }

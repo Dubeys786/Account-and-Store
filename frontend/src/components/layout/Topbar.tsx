@@ -1,22 +1,37 @@
 import React from 'react';
-import { Bell, Search, Store as StoreIcon, ShieldCheck, User as UserIcon } from 'lucide-react';
+import { Bell, Search, Store as StoreIcon, ShieldCheck, User as UserIcon, Menu } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useStore } from '../../context/StoreContext';
 
-export const Topbar: React.FC = () => {
+interface TopbarProps {
+  onToggleMobileMenu?: () => void;
+}
+
+export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileMenu }) => {
   const { user } = useAuth();
   const { activeStore, setActiveStore, availableStores } = useStore();
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-20 shadow-2xs">
-      {/* Search Bar */}
-      <div className="relative w-80">
-        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-        <input
-          type="text"
-          placeholder="Search items, POs, parties, vouchers..."
-          className="w-full pl-9 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
-        />
+    <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-20 shadow-2xs">
+      <div className="flex items-center gap-3">
+        {/* Hamburger Menu Button (Mobile / Tablet) */}
+        <button
+          onClick={onToggleMobileMenu}
+          className="lg:hidden p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+          aria-label="Open sidebar"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        {/* Search Bar */}
+        <div className="relative w-48 sm:w-72 md:w-80">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search items, POs, parties, vouchers..."
+            className="w-full pl-9 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
+          />
+        </div>
       </div>
 
       {/* Right Controls */}

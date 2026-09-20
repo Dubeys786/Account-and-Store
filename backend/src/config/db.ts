@@ -29,7 +29,36 @@ declare global {
   var prismaInstance: PrismaClient | undefined;
 }
 
-export const pglite: PGlite = global.pgliteInstance || new PGlite(dataDir);
+function initPGliteInstance(): PGlite {
+  if (global.pgliteInstance) return global.pgliteInstance;
+
+  // Clean stale lock
+  const pidPath = path.join(dataDir, 'postmaster.pid');
+  if (fs.existsSync(pidPath)) {
+    try {
+      fs.unlinkSync(pidPath);
+    } catch {}
+  }
+
+  try {
+    return new PGlite(dataDir);
+  } catch (err: any) {
+    console.warn('⚠️ PGlite startup issue detected:', err.message || err);
+    console.log('🔄 Re-initializing fresh storage engine directory...');
+    const bakDir = path.resolve(__dirname, `../../prisma/pgdata_corrupt_${Date.now()}`);
+    try {
+      fs.renameSync(dataDir, bakDir);
+    } catch {
+      try {
+        fs.rmSync(dataDir, { recursive: true, force: true });
+      } catch {}
+    }
+    fs.mkdirSync(dataDir, { recursive: true });
+    return new PGlite(dataDir);
+  }
+}
+
+export const pglite: PGlite = initPGliteInstance();
 export const pgliteAdapter = new PrismaPGlite(pglite);
 
 /**
