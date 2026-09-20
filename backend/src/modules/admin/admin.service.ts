@@ -84,7 +84,7 @@ export class AdminService {
       throw new Error('User not found.');
     }
 
-    const rbacData = await RbacService.getUserRbacData(user.id, user.role);
+    const rbacData = await RbacService.getUserRbacData(user.id);
 
     return {
       id: user.id,
@@ -123,7 +123,7 @@ export class AdminService {
     const passwordHash = await bcrypt.hash(rawPassword, 10);
 
     // Map primary role for legacy compatibility
-    let primaryLegacyRole = UserRole.STORE_USER;
+    let primaryLegacyRole: UserRole = UserRole.STORE_USER;
     if (data.roles.includes('ADMIN')) {
       primaryLegacyRole = UserRole.ADMIN;
     } else if (data.roles.includes('ACCOUNT_MANAGER') || data.roles.includes('ACCOUNT_USER')) {
@@ -225,7 +225,7 @@ export class AdminService {
       }
 
       // Sync legacy role enum
-      let updatedLegacyRole = UserRole.STORE_USER;
+      let updatedLegacyRole: UserRole = UserRole.STORE_USER;
       if (roleNames.includes('ADMIN')) {
         updatedLegacyRole = UserRole.ADMIN;
       } else if (roleNames.includes('ACCOUNT_MANAGER') || roleNames.includes('ACCOUNT_USER')) {
