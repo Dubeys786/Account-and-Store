@@ -399,6 +399,16 @@ export class ReceiptService {
       throw new AccountsSecurityError(`Receipt voucher with ID '${receiptId}' not found.`, 404);
     }
 
+    if (user.role !== UserRole.ADMIN) {
+      const receiptStoreId = receipt.party?.storeId;
+      if (receiptStoreId && !user.storeIds.includes(receiptStoreId)) {
+        throw new AccountsSecurityError(
+          'Forbidden: You do not have authorization to access this receipt voucher.',
+          403
+        );
+      }
+    }
+
     return receipt;
   }
 }

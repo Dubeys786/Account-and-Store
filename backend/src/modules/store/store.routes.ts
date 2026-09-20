@@ -10,16 +10,23 @@ import { StockController } from './stock/stock.controller';
 import { StoreDashboardService } from './dashboard/dashboard.service';
 import { StoreReportsService } from './reports/reports.service';
 
+import { preventParameterTampering } from '../../middleware/security.middleware';
+
 const router = Router();
 
 // Store modules are strictly accessible by ADMIN and STORE_USER only. ACCOUNT_USER is forbidden.
-router.use(authenticate, requireRoles([UserRole.ADMIN, UserRole.STORE_USER]));
+router.use(authenticate, preventParameterTampering, requireRoles([UserRole.ADMIN, UserRole.STORE_USER]));
 
-// Lookup endpoints for forms
-router.get('/stores', async (_req: Request, res: Response, next: NextFunction) => {
+// Lookup endpoints for forms (scoped to authorized stores for non-admin)
+router.get('/stores', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const user = req.user!;
+    const where: any = { isActive: true };
+    if (user.role !== UserRole.ADMIN && user.storeIds?.length) {
+      where.id = { in: user.storeIds };
+    }
     const stores = await prisma.store.findMany({
-      where: { isActive: true },
+      where,
       orderBy: { name: 'asc' },
     });
     res.json({ success: true, data: stores });

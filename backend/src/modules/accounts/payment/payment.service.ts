@@ -430,6 +430,16 @@ export class PaymentService {
       throw new AccountsSecurityError(`Payment voucher with ID '${paymentId}' not found.`, 404);
     }
 
+    if (user.role !== UserRole.ADMIN) {
+      const paymentStoreId = payment.transaction?.storeId || payment.party?.storeId;
+      if (paymentStoreId && !user.storeIds.includes(paymentStoreId)) {
+        throw new AccountsSecurityError(
+          'Forbidden: You do not have authorization to access this payment voucher.',
+          403
+        );
+      }
+    }
+
     return payment;
   }
 }

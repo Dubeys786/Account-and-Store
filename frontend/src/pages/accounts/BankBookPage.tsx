@@ -1,62 +1,139 @@
 import React, { useEffect, useState } from 'react';
-import { Building, Download, RefreshCw, ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import {
+  Building,
+  Download,
+  RefreshCw,
+  ArrowDownRight,
+  ArrowUpRight,
+  Building2,
+  Calendar,
+  Landmark,
+  CreditCard,
+} from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/common/Card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/common/Table';
+import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import apiRequest from '../../services/api';
 
 interface BankBookEntry {
   id: string;
-  debitAmount: number;
-  creditAmount: number;
-  description?: string;
-  journalEntry?: {
-    entryNumber: string;
-    entryDate: string;
-    narration: string;
-    referenceType?: string;
-  };
-  party?: {
-    code: string;
-    name: string;
-  };
+  date: string;
+  voucherNumber: string;
+  referenceType?: string;
+  narration: string;
+  particulars: string;
+  party: string;
+  store: string;
+  storeId?: string | null;
+  receipt: number;
+  payment: number;
+  runningBalance: number;
 }
 
-interface BankBookResponse {
+interface BankBookSummary {
   bankAccountCode: string;
-  balance: number;
-  entries: BankBookEntry[];
+  bankAccountName: string;
+  openingBankBalance: number;
+  bankReceipts: number;
+  bankPayments: number;
+  closingBankBalance: number;
+}
+
+interface StoreItem {
+  id: string;
+  code: string;
+  name: string;
 }
 
 export const BankBookPage: React.FC = () => {
-  const [data, setData] = useState<BankBookResponse | null>(null);
+  const [entries, setEntries] = useState<BankBookEntry[]>([]);
+  const [summary, setSummary] = useState<BankBookSummary>({
+    bankAccountCode: '1020',
+    bankAccountName: 'Operating Bank Account',
+    openingBankBalance: 0,
+    bankReceipts: 0,
+    bankPayments: 0,
+    closingBankBalance: 0,
+  });
   const [loading, setLoading] = useState(true);
+
+  // Filters
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [selectedStore, setSelectedStore] = useState('ALL');
+  const [stores, setStores] = useState<StoreItem[]>([]);
 
   const fetchBankBook = async () => {
     setLoading(true);
-    const res = await apiRequest<BankBookResponse>('/accounts/bank-book');
+    const queryParams = new URLSearchParams();
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    if (selectedStore !== 'ALL') queryParams.append('storeId', selectedStore);
+
+    const res = await apiRequest<{ summary: BankBookSummary; entries: BankBookEntry[] }>(
+      `/accounts/bank-book?${queryParams.toString()}`
+    );
+
     if (res.success && res.data) {
-      setData(res.data);
+      if (res.data.summary) {
+        setSummary(res.data.summary);
+      }
+      setEntries(res.data.entries || []);
     }
     setLoading(false);
   };
 
+  const fetchStores = async () => {
+    try {
+      const res = await apiRequest<StoreItem[]>('/accounts/stores');
+      if (res.success && res.data) {
+        setStores(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to load stores', err);
+    }
+  };
+
   useEffect(() => {
-    fetchBankBook();
+    fetchStores();
   }, []);
 
-  const totalIn = data?.entries.reduce((sum, e) => sum + (e.debitAmount || 0), 0) || 0;
-  const totalOut = data?.entries.reduce((sum, e) => sum + (e.creditAmount || 0), 0) || 0;
+  useEffect(() => {
+    fetchBankBook();
+  }, [startDate, endDate, selectedStore]);
+
+  const resetFilters = () => {
+    setStartDate('');
+    setEndDate('');
+    setSelectedStore('ALL');
+  };
 
   const handleExport = () => {
-    if (!data?.entries.length) return;
-    const headers = ['Date', 'Voucher #', 'Particulars', 'Deposit (Debit)', 'Withdrawal (Credit)'];
-    const rows = data.entries.map((e) => [
-      `"${e.journalEntry?.entryDate || ''}"`,
-      `"${e.journalEntry?.entryNumber || ''}"`,
-      `"${(e.description || e.journalEntry?.narration || '').replace(/"/g, '""')}"`,
-      e.debitAmount,
-      e.creditAmount,
+    if (!entries.length) return;
+    const headers = [
+      'Date',
+      'Voucher #',
+      'Type',
+      'Particulars',
+      'Party',
+      'Store',
+      'Deposits (Dr)',
+      'Withdrawals (Cr)',
+      'Running Balance',
+      'Narration',
+    ];
+    const rows = entries.map((e) => [
+      `"${new Date(e.date).toLocaleDateString()}"`,
+      `"${e.voucherNumber}"`,
+      `"${e.referenceType || 'BANK'}"`,
+      `"${e.particulars.replace(/"/g, '""')}"`,
+      `"${e.party}"`,
+      `"${e.store}"`,
+      e.receipt,
+      e.payment,
+      e.runningBalance,
+      `"${e.narration.replace(/"/g, '""')}"`,
     ]);
 
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
@@ -82,7 +159,7 @@ export const BankBookPage: React.FC = () => {
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Bank Book Register</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Bank account ledger (Account 1020 - HDFC Bank Current A/c), deposits, NEFT/RTGS, and cheque clearances
+            Operating bank account ledger (Account 1020), deposits, NEFT/RTGS, UPI settlements, and withdrawals with running balance
           </p>
         </div>
         <div className="flex items-center gap-2.5">
@@ -100,35 +177,107 @@ export const BankBookPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* 4 Required KPI Summary Cards:
+          Opening Bank Balance, Bank Receipts, Bank Payments, Closing Bank Balance */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 1. Opening Bank Balance */}
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Account Name</span>
-          <p className="text-sm font-bold text-slate-900 mt-1">HDFC Bank Current A/c</p>
-          <p className="text-[10px] text-slate-400">A/c No: 50200012345678 (1020)</p>
+          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Opening Bank Balance</span>
+          <p className="text-xl font-bold text-slate-900 mt-1">
+            ₹ {summary.openingBankBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </p>
+          <span className="text-[10px] text-slate-400">Balance prior to selected period</span>
         </div>
+
+        {/* 2. Bank Receipts */}
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Bank Deposits</span>
+          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Bank Receipts</span>
           <p className="text-xl font-bold text-emerald-600 mt-1">
-            + ₹ {totalIn.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            + ₹ {summary.bankReceipts.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </p>
-          <span className="text-[10px] text-slate-400">NEFT / RTGS / Cheque inflows</span>
+          <span className="text-[10px] text-slate-400">Deposits, UPI, NEFT inflows</span>
         </div>
+
+        {/* 3. Bank Payments */}
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Current Bank Balance</span>
-          <p className="text-xl font-bold text-blue-600 mt-1">
-            ₹ {(data?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Bank Payments</span>
+          <p className="text-xl font-bold text-rose-600 mt-1">
+            - ₹ {summary.bankPayments.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </p>
-          <span className="text-[10px] text-slate-400">Available bank liquidity</span>
+          <span className="text-[10px] text-slate-400">Vendor transfers, cheques & RTGS</span>
+        </div>
+
+        {/* 4. Closing Bank Balance */}
+        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
+          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Closing Bank Balance</span>
+          <p className="text-xl font-bold text-blue-600 mt-1">
+            ₹ {summary.closingBankBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </p>
+          <span className="text-[10px] text-slate-400">Formula: Opening + Receipts - Payments</span>
         </div>
       </div>
 
+      {/* Filter by Date and Store */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Store Filter */}
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-slate-400" />
+                <select
+                  value={selectedStore}
+                  onChange={(e) => setSelectedStore(e.target.value)}
+                  className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="ALL">All Stores & Locations</option>
+                  {stores.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date Filter */}
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-slate-400" />
+                <span className="text-xs text-slate-500 font-medium">From:</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="px-2.5 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg"
+                />
+                <span className="text-xs text-slate-500 font-medium">To:</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="px-2.5 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="ghost" onClick={resetFilters}>
+                Clear
+              </Button>
+              <Button size="sm" variant="outline" onClick={fetchBankBook}>
+                Filter
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Bank Book Ledger Table */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between py-3">
           <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            Bank Ledger Entries (1020 - HDFC Bank Current A/c)
+            Bank Statement Ledger Entries (1020 - Operating Bank Account)
           </span>
-          <span className="text-xs font-semibold text-slate-500">{data?.entries.length || 0} Ledger Entries</span>
+          <span className="text-xs font-semibold text-slate-500">{entries.length} Ledger Entries</span>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -136,55 +285,65 @@ export const BankBookPage: React.FC = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Voucher / Cheque #</TableHead>
-                  <TableHead>Particulars</TableHead>
+                  <TableHead>Voucher / Txn #</TableHead>
+                  <TableHead>Particulars (Contra)</TableHead>
                   <TableHead>Party Involved</TableHead>
-                  <TableHead className="text-right">Deposit (Debit)</TableHead>
-                  <TableHead className="text-right">Withdrawal (Credit)</TableHead>
+                  <TableHead>Store</TableHead>
+                  <TableHead className="text-right">Deposits (Dr ₹)</TableHead>
+                  <TableHead className="text-right">Withdrawals (Cr ₹)</TableHead>
+                  <TableHead className="text-right font-bold">Running Balance (₹)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12 text-slate-400">
+                    <TableCell colSpan={8} className="text-center py-12 text-slate-400">
                       <div className="flex items-center justify-center gap-2">
                         <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
-                        <span>Loading bank statement from database...</span>
+                        <span>Calculating Bank Book statement from database...</span>
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : !data?.entries || data.entries.length === 0 ? (
+                ) : entries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10 text-slate-400">
-                      No bank transactions recorded yet.
+                    <TableCell colSpan={8} className="text-center py-10 text-slate-400">
+                      No bank transactions recorded for selected date and store.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  data.entries.map((line) => (
-                    <TableRow key={line.id} className="hover:bg-slate-50/80 transition-colors">
+                  entries.map((entry) => (
+                    <TableRow key={entry.id} className="hover:bg-slate-50/80 transition-colors">
                       <TableCell className="text-xs text-slate-600 whitespace-nowrap">
-                        {line.journalEntry?.entryDate
-                          ? new Date(line.journalEntry.entryDate).toLocaleDateString('en-IN')
-                          : '—'}
+                        {new Date(entry.date).toLocaleDateString('en-IN', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
                       </TableCell>
                       <TableCell className="font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
-                        {line.journalEntry?.entryNumber || '—'}
+                        {entry.voucherNumber}
+                        <div className="text-[10px] text-slate-400 font-normal">{entry.referenceType}</div>
                       </TableCell>
                       <TableCell className="text-xs font-medium text-slate-800">
-                        {line.description || line.journalEntry?.narration || 'Bank Transfer'}
+                        {entry.particulars}
+                        <div className="text-[10px] text-slate-500 truncate max-w-[200px] font-normal">
+                          {entry.narration}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-xs text-slate-600">
-                        {line.party?.name ? (
-                          <span className="font-medium text-slate-800">{line.party.name}</span>
-                        ) : (
-                          <span className="text-slate-400">Direct Bank Transfer</span>
-                        )}
+                      <TableCell className="text-xs text-slate-700">
+                        {entry.party}
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-emerald-700 font-bold text-right whitespace-nowrap">
-                        {line.debitAmount > 0 ? `₹ ${line.debitAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                      <TableCell className="text-xs text-slate-600 whitespace-nowrap">
+                        {entry.store}
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-rose-700 font-bold text-right whitespace-nowrap">
-                        {line.creditAmount > 0 ? `₹ ${line.creditAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                      <TableCell className="font-mono text-xs font-bold text-emerald-600 text-right whitespace-nowrap">
+                        {entry.receipt > 0 ? `₹ ${entry.receipt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs font-bold text-rose-600 text-right whitespace-nowrap">
+                        {entry.payment > 0 ? `₹ ${entry.payment.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs font-bold text-blue-700 text-right whitespace-nowrap bg-blue-50/30">
+                        ₹ {entry.runningBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </TableCell>
                     </TableRow>
                   ))

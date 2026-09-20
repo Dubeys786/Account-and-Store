@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { JournalService } from './journal.service';
 
+import { AuditService } from '../../audit/audit.service';
+
 export class JournalController {
   /**
    * POST /api/v1/accounts/journal-entries
@@ -9,6 +11,17 @@ export class JournalController {
   static async createJournalEntry(req: Request, res: Response, _next: NextFunction): Promise<void> {
     try {
       const entry = await JournalService.createJournalEntry(req.body);
+
+      await AuditService.record({
+        userId: req.user?.id,
+        action: 'JOURNAL',
+        entity: 'JournalEntry',
+        entityId: entry.id,
+        newValues: { entryNumber: entry.entryNumber, totalAmount: entry.totalAmount, narration: entry.narration },
+        ipAddress: req.ip || req.socket.remoteAddress,
+        userAgent: req.headers['user-agent'],
+      });
+
       res.status(201).json({
         success: true,
         message: 'Journal entry posted successfully. Total debit equals total credit.',

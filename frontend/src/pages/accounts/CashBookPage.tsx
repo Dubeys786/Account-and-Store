@@ -1,62 +1,140 @@
 import React, { useEffect, useState } from 'react';
-import { DollarSign, Download, RefreshCw, ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import {
+  DollarSign,
+  Download,
+  RefreshCw,
+  ArrowDownRight,
+  ArrowUpRight,
+  Building2,
+  Calendar,
+  Wallet,
+  Coins,
+  FileSpreadsheet,
+} from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/common/Card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/common/Table';
+import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import apiRequest from '../../services/api';
 
 interface CashBookEntry {
   id: string;
-  debitAmount: number;
-  creditAmount: number;
-  description?: string;
-  journalEntry?: {
-    entryNumber: string;
-    entryDate: string;
-    narration: string;
-    referenceType?: string;
-  };
-  party?: {
-    code: string;
-    name: string;
-  };
+  date: string;
+  voucherNumber: string;
+  referenceType?: string;
+  narration: string;
+  particulars: string;
+  party: string;
+  store: string;
+  storeId?: string | null;
+  receipt: number;
+  payment: number;
+  runningBalance: number;
 }
 
-interface CashBookResponse {
+interface CashBookSummary {
   cashAccountCode: string;
-  balance: number;
-  entries: CashBookEntry[];
+  cashAccountName: string;
+  openingCash: number;
+  cashReceipts: number;
+  cashPayments: number;
+  closingCash: number;
+}
+
+interface StoreItem {
+  id: string;
+  code: string;
+  name: string;
 }
 
 export const CashBookPage: React.FC = () => {
-  const [data, setData] = useState<CashBookResponse | null>(null);
+  const [entries, setEntries] = useState<CashBookEntry[]>([]);
+  const [summary, setSummary] = useState<CashBookSummary>({
+    cashAccountCode: '1010',
+    cashAccountName: 'Cash on Hand',
+    openingCash: 0,
+    cashReceipts: 0,
+    cashPayments: 0,
+    closingCash: 0,
+  });
   const [loading, setLoading] = useState(true);
+
+  // Filters
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [selectedStore, setSelectedStore] = useState('ALL');
+  const [stores, setStores] = useState<StoreItem[]>([]);
 
   const fetchCashBook = async () => {
     setLoading(true);
-    const res = await apiRequest<CashBookResponse>('/accounts/cash-book');
+    const queryParams = new URLSearchParams();
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    if (selectedStore !== 'ALL') queryParams.append('storeId', selectedStore);
+
+    const res = await apiRequest<{ summary: CashBookSummary; entries: CashBookEntry[] }>(
+      `/accounts/cash-book?${queryParams.toString()}`
+    );
+
     if (res.success && res.data) {
-      setData(res.data);
+      if (res.data.summary) {
+        setSummary(res.data.summary);
+      }
+      setEntries(res.data.entries || []);
     }
     setLoading(false);
   };
 
+  const fetchStores = async () => {
+    try {
+      const res = await apiRequest<StoreItem[]>('/accounts/stores');
+      if (res.success && res.data) {
+        setStores(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to load stores', err);
+    }
+  };
+
   useEffect(() => {
-    fetchCashBook();
+    fetchStores();
   }, []);
 
-  const totalIn = data?.entries.reduce((sum, e) => sum + (e.debitAmount || 0), 0) || 0;
-  const totalOut = data?.entries.reduce((sum, e) => sum + (e.creditAmount || 0), 0) || 0;
+  useEffect(() => {
+    fetchCashBook();
+  }, [startDate, endDate, selectedStore]);
+
+  const resetFilters = () => {
+    setStartDate('');
+    setEndDate('');
+    setSelectedStore('ALL');
+  };
 
   const handleExport = () => {
-    if (!data?.entries.length) return;
-    const headers = ['Date', 'Voucher #', 'Particulars', 'Cash In (Debit)', 'Cash Out (Credit)'];
-    const rows = data.entries.map((e) => [
-      `"${e.journalEntry?.entryDate || ''}"`,
-      `"${e.journalEntry?.entryNumber || ''}"`,
-      `"${(e.description || e.journalEntry?.narration || '').replace(/"/g, '""')}"`,
-      e.debitAmount,
-      e.creditAmount,
+    if (!entries.length) return;
+    const headers = [
+      'Date',
+      'Voucher #',
+      'Type',
+      'Particulars',
+      'Party',
+      'Store',
+      'Receipt (Dr)',
+      'Payment (Cr)',
+      'Running Balance',
+      'Narration',
+    ];
+    const rows = entries.map((e) => [
+      `"${new Date(e.date).toLocaleDateString()}"`,
+      `"${e.voucherNumber}"`,
+      `"${e.referenceType || 'CASH'}"`,
+      `"${e.particulars.replace(/"/g, '""')}"`,
+      `"${e.party}"`,
+      `"${e.store}"`,
+      e.receipt,
+      e.payment,
+      e.runningBalance,
+      `"${e.narration.replace(/"/g, '""')}"`,
     ]);
 
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
@@ -82,7 +160,7 @@ export const CashBookPage: React.FC = () => {
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Cash Book Register</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Physical cash in hand ledger (Account 1010), daily receipts, and petty cash disbursements
+            Physical cash in hand register (Account 1010), opening balance, cash receipts, and disbursements with live running balance
           </p>
         </div>
         <div className="flex items-center gap-2.5">
@@ -95,42 +173,112 @@ export const CashBookPage: React.FC = () => {
             Refresh
           </Button>
           <Button size="sm" variant="outline" icon={<Download className="w-3.5 h-3.5" />} onClick={handleExport}>
-            Export Cash Book
+            Export Cash Statement
           </Button>
         </div>
       </div>
 
-      {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* 4 Required KPI Summary Cards:
+          Opening Cash, Cash Receipts, Cash Payments, Closing Cash */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 1. Opening Cash */}
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Cash Inflow</span>
+          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Opening Cash Balance</span>
+          <p className="text-xl font-bold text-slate-900 mt-1">
+            ₹ {summary.openingCash.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </p>
+          <span className="text-[10px] text-slate-400">Balance prior to selected period</span>
+        </div>
+
+        {/* 2. Cash Receipts */}
+        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
+          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Cash Receipts</span>
           <p className="text-xl font-bold text-emerald-600 mt-1">
-            + ₹ {totalIn.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            + ₹ {summary.cashReceipts.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </p>
-          <span className="text-[10px] text-slate-400">Total collections debited</span>
+          <span className="text-[10px] text-slate-400">Total physical cash collections</span>
         </div>
+
+        {/* 3. Cash Payments */}
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Cash Outflow</span>
+          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Cash Payments</span>
           <p className="text-xl font-bold text-rose-600 mt-1">
-            - ₹ {totalOut.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            - ₹ {summary.cashPayments.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </p>
-          <span className="text-[10px] text-slate-400">Disbursements & petty cash</span>
+          <span className="text-[10px] text-slate-400">Total cash disbursements & petty cash</span>
         </div>
+
+        {/* 4. Closing Cash */}
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
           <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Closing Cash in Hand</span>
           <p className="text-xl font-bold text-blue-600 mt-1">
-            ₹ {(data?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            ₹ {summary.closingCash.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </p>
-          <span className="text-[10px] text-slate-400">Account 1010 - Liquid balance</span>
+          <span className="text-[10px] text-slate-400">Formula: Opening + Receipts - Payments</span>
         </div>
       </div>
 
+      {/* Filter by Date and Store */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Store Filter */}
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-slate-400" />
+                <select
+                  value={selectedStore}
+                  onChange={(e) => setSelectedStore(e.target.value)}
+                  className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="ALL">All Stores & Locations</option>
+                  {stores.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date Filter */}
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-slate-400" />
+                <span className="text-xs text-slate-500 font-medium">From:</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="px-2.5 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg"
+                />
+                <span className="text-xs text-slate-500 font-medium">To:</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="px-2.5 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="ghost" onClick={resetFilters}>
+                Clear
+              </Button>
+              <Button size="sm" variant="outline" onClick={fetchCashBook}>
+                Filter
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Cash Book Ledger Table */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between py-3">
           <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            Cash Transactions Ledger (1010 - Cash in Hand)
+            Cash Book Ledger Entries (1010 - Cash on Hand)
           </span>
-          <span className="text-xs font-semibold text-slate-500">{data?.entries.length || 0} Ledger Entries</span>
+          <span className="text-xs font-semibold text-slate-500">{entries.length} Ledger Entries</span>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -139,54 +287,64 @@ export const CashBookPage: React.FC = () => {
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Voucher #</TableHead>
-                  <TableHead>Particulars</TableHead>
+                  <TableHead>Particulars (Contra)</TableHead>
                   <TableHead>Party Involved</TableHead>
-                  <TableHead className="text-right">Cash In (Debit)</TableHead>
-                  <TableHead className="text-right">Cash Out (Credit)</TableHead>
+                  <TableHead>Store</TableHead>
+                  <TableHead className="text-right">Receipts (Dr ₹)</TableHead>
+                  <TableHead className="text-right">Payments (Cr ₹)</TableHead>
+                  <TableHead className="text-right font-bold">Running Balance (₹)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12 text-slate-400">
+                    <TableCell colSpan={8} className="text-center py-12 text-slate-400">
                       <div className="flex items-center justify-center gap-2">
                         <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
-                        <span>Loading cash book from database...</span>
+                        <span>Calculating Cash Book ledger from database...</span>
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : !data?.entries || data.entries.length === 0 ? (
+                ) : entries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10 text-slate-400">
-                      No cash transactions recorded yet.
+                    <TableCell colSpan={8} className="text-center py-10 text-slate-400">
+                      No cash transactions recorded for selected date and store.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  data.entries.map((line) => (
-                    <TableRow key={line.id} className="hover:bg-slate-50/80 transition-colors">
+                  entries.map((entry) => (
+                    <TableRow key={entry.id} className="hover:bg-slate-50/80 transition-colors">
                       <TableCell className="text-xs text-slate-600 whitespace-nowrap">
-                        {line.journalEntry?.entryDate
-                          ? new Date(line.journalEntry.entryDate).toLocaleDateString('en-IN')
-                          : '—'}
+                        {new Date(entry.date).toLocaleDateString('en-IN', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
                       </TableCell>
                       <TableCell className="font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
-                        {line.journalEntry?.entryNumber || '—'}
+                        {entry.voucherNumber}
+                        <div className="text-[10px] text-slate-400 font-normal">{entry.referenceType}</div>
                       </TableCell>
                       <TableCell className="text-xs font-medium text-slate-800">
-                        {line.description || line.journalEntry?.narration || 'Cash Settlement'}
+                        {entry.particulars}
+                        <div className="text-[10px] text-slate-500 truncate max-w-[200px] font-normal">
+                          {entry.narration}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-xs text-slate-600">
-                        {line.party?.name ? (
-                          <span className="font-medium text-slate-800">{line.party.name}</span>
-                        ) : (
-                          <span className="text-slate-400">Direct Petty Cash</span>
-                        )}
+                      <TableCell className="text-xs text-slate-700">
+                        {entry.party}
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-emerald-700 font-bold text-right whitespace-nowrap">
-                        {line.debitAmount > 0 ? `₹ ${line.debitAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                      <TableCell className="text-xs text-slate-600 whitespace-nowrap">
+                        {entry.store}
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-rose-700 font-bold text-right whitespace-nowrap">
-                        {line.creditAmount > 0 ? `₹ ${line.creditAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                      <TableCell className="font-mono text-xs font-bold text-emerald-600 text-right whitespace-nowrap">
+                        {entry.receipt > 0 ? `₹ ${entry.receipt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs font-bold text-rose-600 text-right whitespace-nowrap">
+                        {entry.payment > 0 ? `₹ ${entry.payment.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs font-bold text-blue-700 text-right whitespace-nowrap bg-blue-50/30">
+                        ₹ {entry.runningBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </TableCell>
                     </TableRow>
                   ))

@@ -9,6 +9,7 @@ export class AccountsSecurityError extends Error {
     super(message);
     this.name = 'AccountsSecurityError';
     this.statusCode = statusCode;
+    Object.setPrototypeOf(this, AccountsSecurityError.prototype);
   }
 }
 
@@ -96,3 +97,35 @@ export function resolveAndValidateStoreId(req: Request, explicitStoreId?: string
 
   return storeId;
 }
+
+/**
+ * Validates that the purchase order exists and that the user is authorized to access it (IDOR protection).
+ */
+export async function validatePOAccess(req: Request, poId: string) {
+  if (!req.user) {
+    throw new AccountsSecurityError('Unauthorized: User is not authenticated.', 401);
+  }
+
+  if (!poId) {
+    throw new AccountsSecurityError('Purchase Order ID is required.', 400);
+  }
+
+  const po = await prisma.purchaseOrder.findUnique({
+    where: { id: poId },
+    include: { store: true },
+  });
+
+  if (!po) {
+    throw new AccountsSecurityError(`Purchase Order with ID '${poId}' not found.`, 404);
+  }
+
+  if (req.user.role !== UserRole.ADMIN && !req.user.storeIds.includes(po.storeId)) {
+    throw new AccountsSecurityError(
+      'Forbidden: You are not authorized to access this Purchase Order.',
+      403
+    );
+  }
+
+  return po;
+}
+

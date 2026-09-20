@@ -1,8 +1,10 @@
 import prisma from '../../../config/db';
-import { TransactionType, PaymentStatus, Prisma } from '@prisma/client';
+import { TransactionType, PaymentStatus, Prisma, UserRole } from '@prisma/client';
 import { CreateTransactionDTO, TransactionQueryFilters } from './transaction.types';
 import { JournalService } from '../foundation/journal.service';
 import { JournalLineInput } from '../foundation/accounting.types';
+import { AccountsSecurityError } from '../accounts.guard';
+import { AuditService } from '../../audit/audit.service';
 
 export class TransactionService {
   /**
@@ -565,5 +567,134 @@ export class TransactionService {
     }
 
     return transaction;
+  }
+
+  /**
+   * Void / Reverse an accounting transaction with an offsetting journal entry.
+   * STRICT IMMUTABILITY: Historical records are never physically deleted.
+   */
+  static async voidTransaction(
+    transactionId: string,
+    user: { id: string; role: UserRole; storeIds: string[] },
+    reason?: string
+  ) {
+    const transaction = await prisma.accountingTransaction.findUnique({
+      where: { id: transactionId },
+      include: {
+        store: true,
+        party: true,
+        journalEntry: {
+          include: {
+            lines: true,
+          },
+        },
+        payments: true,
+      },
+    });
+
+    if (!transaction) {
+      throw new AccountsSecurityError(`Accounting transaction with ID '${transactionId}' not found.`, 404);
+    }
+
+    // Store tenancy check
+    if (user.role !== UserRole.ADMIN && !user.storeIds.includes(transaction.storeId)) {
+      throw new AccountsSecurityError(
+        `Forbidden: You do not have authorization to void transactions in store '${transaction.store.name}'.`,
+        403
+      );
+    }
+
+    if (transaction.notes?.includes('[VOIDED')) {
+      throw new Error(`Transaction '${transaction.invoiceNumber}' has already been voided/reversed.`);
+    }
+
+    if (transaction.paidAmount > 0) {
+      throw new Error(
+        `Cannot void invoice '${transaction.invoiceNumber}' because payments (₹${transaction.paidAmount.toFixed(2)}) have been recorded against it. Reverse the payments first.`
+      );
+    }
+
+    // Perform non-destructive reversal in a database transaction
+    const result = await prisma.$transaction(
+      async (tx) => {
+        let reversalJournalId: string | null = null;
+
+        if (transaction.journalEntry && transaction.journalEntry.lines.length > 0) {
+          // Swap debit and credit amounts for each line to completely offset the ledger
+          const reversalLines = transaction.journalEntry.lines.map((l) => ({
+            accountId: l.accountId,
+            partyId: l.partyId,
+            debitAmount: l.creditAmount, // swapped!
+            creditAmount: l.debitAmount, // swapped!
+            description: `[REVERSAL] ${l.description || ''}`.trim(),
+          }));
+
+          const totalReversal = reversalLines.reduce((acc, l) => acc + l.debitAmount, 0);
+
+          const revNumber = `REV-${Date.now().toString().slice(-6)}`;
+          const revJournal = await tx.journalEntry.create({
+            data: {
+              entryNumber: revNumber,
+              entryDate: new Date(),
+              referenceType: 'VOID',
+              referenceId: transaction.id,
+              narration: `[VOID REVERSAL] Reversal of ${transaction.invoiceNumber} - ${reason || 'Voided transaction'}`,
+              totalAmount: totalReversal,
+              lines: {
+                create: reversalLines,
+              },
+            },
+          });
+          reversalJournalId = revJournal.id;
+        }
+
+        const updatedNotes = `[VOIDED on ${new Date().toISOString()}] ${reason || 'Voided by user'}\n${transaction.notes || ''}`.trim();
+
+        // Update transaction status without physical deletion!
+        const updatedTx = await tx.accountingTransaction.update({
+          where: { id: transaction.id },
+          data: {
+            notes: updatedNotes,
+          },
+          include: {
+            store: true,
+            party: true,
+            journalEntry: {
+              include: { lines: true },
+            },
+          },
+        });
+
+        return {
+          transaction: updatedTx,
+          reversalJournalId,
+          updatedNotes,
+          message: `Transaction ${transaction.invoiceNumber} voided and offsetting journal reversal posted successfully.`,
+        };
+      },
+      { maxWait: 15000, timeout: 25000 }
+    );
+
+    // Record AuditLog outside the database transaction
+    await AuditService.record({
+      userId: user.id,
+      action: 'VOID',
+      entity: 'AccountingTransaction',
+      entityId: transaction.id,
+      oldValues: {
+        invoiceNumber: transaction.invoiceNumber,
+        netAmount: transaction.netAmount,
+        notes: transaction.notes,
+        journalEntryId: transaction.journalEntryId,
+      },
+      newValues: {
+        voided: true,
+        reason,
+        reversalJournalId: result.reversalJournalId,
+        updatedNotes: result.updatedNotes,
+      },
+    });
+
+    return result;
   }
 }

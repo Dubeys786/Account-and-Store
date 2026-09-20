@@ -14,13 +14,19 @@ import { PaymentService } from './payment/payment.service';
 import { ReceiptService } from './receipt/receipt.service';
 import { PayablesService } from './payables/payables.service';
 import { ReceivablesService } from './receivables/receivables.service';
+import { ExpenseService } from './expense/expense.service';
+import { IncomeService } from './income/income.service';
+import { BooksService } from './books/books.service';
+import { ReportsService } from './reports/reports.service';
 import { AccountsSecurityError } from './accounts.guard';
+import { preventParameterTampering } from '../../middleware/security.middleware';
+import { AuditService } from '../audit/audit.service';
 
 const router = Router();
 
 // Accounts modules are strictly accessible by ADMIN and ACCOUNT_USER only.
 // STORE_USER is strictly FORBIDDEN to access these routes!
-router.use(authenticate, requireRoles([UserRole.ADMIN, UserRole.ACCOUNT_USER]));
+router.use(authenticate, preventParameterTampering, requireRoles([UserRole.ADMIN, UserRole.ACCOUNT_USER]));
 
 // ==========================================
 // 1. DASHBOARD & METRICS
@@ -191,6 +197,7 @@ router.post('/ledger-accounts', JournalController.createLedgerAccount);
 router.post('/transactions', TransactionController.createTransaction);
 router.get('/transactions', TransactionController.getTransactions);
 router.get('/transactions/:id', TransactionController.getTransactionById);
+router.post('/transactions/:id/void', TransactionController.voidTransaction);
 
 // ==========================================
 // 5.1 PURCHASE ACCOUNTING WITH PO WORKFLOW
@@ -384,269 +391,580 @@ router.get('/purchases', async (req: Request, res: Response) => {
 // ==========================================
 // 6. RECEIVABLES & PAYABLES
 // ==========================================
-router.get('/receivables', async (_req: Request, res: Response) => {
+router.get('/receivables', async (req: Request, res: Response) => {
   try {
-    const customers = await prisma.party.findMany({
-      where: { type: { in: ['CUSTOMER', 'DEALER', 'DISTRIBUTOR'] }, status: 'ACTIVE' },
-      take: 20,
-      include: { store: { select: { id: true, code: true, name: true } } },
-    });
+    const user = req.user!;
+    const { search, customerId, storeId, status, startDate, endDate, page, limit } = req.query;
 
-    const customersWithBalance = await Promise.all(
-      customers.map(async (c) => {
-        try {
-          const bal = await LedgerService.getPartyBalance(c.id);
-          return {
-            ...c,
-            currentBalance: bal.currentBalance.amount,
-            balanceType: bal.currentBalance.type,
-            formattedBalance: bal.formattedBalance,
-          };
-        } catch {
-          return {
-            ...c,
-            currentBalance: c.openingBalance,
-            balanceType: c.openingBalanceType,
-            formattedBalance: `₹ ${c.openingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-          };
-        }
-      })
+    const result = await ReceivablesService.getReceivables(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      {
+        search: search as string,
+        customerId: customerId as string,
+        storeId: storeId as string,
+        status: status as string,
+        startDate: startDate as string,
+        endDate: endDate as string,
+        page: page ? parseInt(page as string, 10) : 1,
+        limit: limit ? parseInt(limit as string, 10) : 50,
+      }
     );
-
-    const salesAgg = await prisma.accountingTransaction.aggregate({
-      _sum: { netAmount: true, paidAmount: true },
-      where: { transactionType: { in: ['SALE', 'SALES'] } },
-    });
-    const totalReceivables = Math.round(((salesAgg._sum.netAmount || 0) - (salesAgg._sum.paidAmount || 0)) * 100) / 100;
 
     res.json({
       success: true,
-      message: 'Receivables aging and party list retrieved.',
-      data: {
-        totalReceivables: totalReceivables > 0 ? totalReceivables : 450000,
-        records: customersWithBalance,
-      },
+      message: 'Receivables list and aging retrieved.',
+      data: result.records,
+      summary: result.summary,
+      pagination: result.pagination,
     });
   } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-router.get('/payables', async (_req: Request, res: Response) => {
+router.get('/payables', async (req: Request, res: Response) => {
   try {
-    const suppliers = await prisma.party.findMany({
-      where: { type: 'SUPPLIER', status: 'ACTIVE' },
-      take: 20,
-      include: { store: { select: { id: true, code: true, name: true } } },
-    });
+    const user = req.user!;
+    const { search, supplierId, storeId, status, startDate, endDate, page, limit } = req.query;
 
-    const suppliersWithBalance = await Promise.all(
-      suppliers.map(async (s) => {
-        try {
-          const bal = await LedgerService.getPartyBalance(s.id);
-          return {
-            ...s,
-            currentBalance: bal.currentBalance.amount,
-            balanceType: bal.currentBalance.type,
-            formattedBalance: bal.formattedBalance,
-          };
-        } catch {
-          return {
-            ...s,
-            currentBalance: s.openingBalance,
-            balanceType: s.openingBalanceType,
-            formattedBalance: `₹ ${s.openingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-          };
-        }
-      })
+    const result = await PayablesService.getPayables(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      {
+        search: search as string,
+        supplierId: supplierId as string,
+        storeId: storeId as string,
+        status: status as string,
+        startDate: startDate as string,
+        endDate: endDate as string,
+        page: page ? parseInt(page as string, 10) : 1,
+        limit: limit ? parseInt(limit as string, 10) : 50,
+      }
     );
-
-    const purchaseAgg = await prisma.accountingTransaction.aggregate({
-      _sum: { netAmount: true, paidAmount: true },
-      where: { transactionType: { in: ['PURCHASE', 'PURCHASE_WITH_PO', 'PURCHASE_WITHOUT_PO'] } },
-    });
-    const totalPayables = Math.round(((purchaseAgg._sum.netAmount || 0) - (purchaseAgg._sum.paidAmount || 0)) * 100) / 100;
 
     res.json({
       success: true,
-      message: 'Payables aging and supplier list retrieved.',
-      data: {
-        totalPayables: totalPayables > 0 ? totalPayables : 285000,
-        records: suppliersWithBalance,
-      },
+      message: 'Payables list and aging retrieved.',
+      data: result.records,
+      summary: result.summary,
+      pagination: result.pagination,
     });
   } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
 // ==========================================
-// 7. PAYMENTS & RECEIPTS
+// 7. PAYMENTS & RECEIPTS (With Atomic Ledger, Payable/Receivable, Outstanding & Journal Updates)
 // ==========================================
-router.get('/payments', async (_req: Request, res: Response) => {
+router.get('/payments', async (req: Request, res: Response) => {
   try {
-    const payments = await prisma.payment.findMany({
-      include: { party: true, account: true },
-      take: 20,
-      orderBy: { paymentDate: 'desc' },
+    const user = req.user!;
+    const { partyId, storeId, paymentMethod, startDate, endDate, search, page, limit } = req.query;
+
+    const result = await PaymentService.getPayments(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      {
+        partyId: partyId as string,
+        storeId: storeId as string,
+        paymentMethod: paymentMethod as string,
+        startDate: startDate as string,
+        endDate: endDate as string,
+        search: search as string,
+        page: page ? parseInt(page as string, 10) : 1,
+        limit: limit ? parseInt(limit as string, 10) : 50,
+      }
+    );
+
+    res.json({
+      success: true,
+      message: 'Payments retrieved successfully.',
+      data: result.records,
+      pagination: result.pagination,
     });
-    res.json({ success: true, message: 'Payments retrieved.', data: payments });
   } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-router.get('/receipts', async (_req: Request, res: Response) => {
+router.get('/payments/:id', async (req: Request, res: Response) => {
   try {
-    const receipts = await prisma.receipt.findMany({
-      include: { party: true, account: true },
-      take: 20,
-      orderBy: { receiptDate: 'desc' },
+    const user = req.user!;
+    const payment = await PaymentService.getPaymentById(req.params.id, {
+      id: user.id,
+      role: user.role,
+      storeIds: user.storeIds || [],
     });
-    res.json({ success: true, message: 'Receipts retrieved.', data: receipts });
+
+    res.json({
+      success: true,
+      message: 'Payment voucher details retrieved.',
+      data: payment,
+    });
   } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(404).json({ success: false, message: error.message });
+  }
+});
+
+router.post('/payments', async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
+    const { partyId, storeId, transactionId, poId, amount, paymentDate, paymentMethod, referenceNumber, notes } =
+      req.body;
+
+    const result = await PaymentService.createPayment(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      {
+        partyId,
+        storeId,
+        transactionId,
+        poId,
+        amount: Number(amount),
+        paymentDate,
+        paymentMethod,
+        referenceNumber,
+        notes,
+        ipAddress: req.ip || req.socket.remoteAddress,
+        userAgent: req.get('user-agent'),
+      }
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Payment voucher recorded successfully.',
+      data: result,
+    });
+  } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/receipts', async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
+    const { partyId, storeId, paymentMethod, startDate, endDate, search, page, limit } = req.query;
+
+    const result = await ReceiptService.getReceipts(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      {
+        partyId: partyId as string,
+        storeId: storeId as string,
+        paymentMethod: paymentMethod as string,
+        startDate: startDate as string,
+        endDate: endDate as string,
+        search: search as string,
+        page: page ? parseInt(page as string, 10) : 1,
+        limit: limit ? parseInt(limit as string, 10) : 50,
+      }
+    );
+
+    res.json({
+      success: true,
+      message: 'Receipts retrieved successfully.',
+      data: result.records,
+      pagination: result.pagination,
+    });
+  } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/receipts/:id', async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
+    const receipt = await ReceiptService.getReceiptById(req.params.id, {
+      id: user.id,
+      role: user.role,
+      storeIds: user.storeIds || [],
+    });
+
+    res.json({
+      success: true,
+      message: 'Receipt voucher details retrieved.',
+      data: receipt,
+    });
+  } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(404).json({ success: false, message: error.message });
+  }
+});
+
+router.post('/receipts', async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
+    const { partyId, storeId, transactionId, amount, receiptDate, paymentMethod, referenceNumber, notes } = req.body;
+
+    const result = await ReceiptService.createReceipt(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      {
+        partyId,
+        storeId,
+        transactionId,
+        amount: Number(amount),
+        receiptDate,
+        paymentMethod,
+        referenceNumber,
+        notes,
+        ipAddress: req.ip || req.socket.remoteAddress,
+        userAgent: req.get('user-agent'),
+      }
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Receipt voucher recorded successfully.',
+      data: result,
+    });
+  } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(400).json({ success: false, message: error.message });
   }
 });
 
 // ==========================================
 // 8. EXPENSES & INCOME
 // ==========================================
-router.get('/expenses', async (_req: Request, res: Response) => {
+router.get('/expenses', async (req: Request, res: Response) => {
   try {
-    const expenses = await prisma.expense.findMany({
-      include: { account: true, store: true },
-      take: 20,
-      orderBy: { expenseDate: 'desc' },
-    });
-    res.json({ success: true, message: 'Expenses retrieved.', data: expenses });
+    const user = req.user!;
+    const result = await ExpenseService.getExpenses(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      req.query
+    );
+    res.json({ success: true, message: 'Expenses retrieved.', data: result });
   } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-router.get('/income', async (_req: Request, res: Response) => {
+router.get('/expenses/:id', async (req: Request, res: Response) => {
   try {
-    const income = await prisma.income.findMany({
-      include: { account: true, store: true },
-      take: 20,
-      orderBy: { incomeDate: 'desc' },
-    });
-    res.json({ success: true, message: 'Income records retrieved.', data: income });
+    const user = req.user!;
+    const expense = await ExpenseService.getExpenseById(
+      req.params.id,
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] }
+    );
+    res.json({ success: true, message: 'Expense details retrieved.', data: expense });
   } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(404).json({ success: false, message: error.message });
+  }
+});
+
+router.post('/expenses', async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
+    const { expenseDate, storeId, category, partyId, amount, paymentMethod, reference, description } = req.body;
+
+    const result = await ExpenseService.createExpense(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      {
+        expenseDate,
+        storeId,
+        category,
+        partyId,
+        amount: Number(amount),
+        paymentMethod,
+        reference,
+        description,
+        ipAddress: req.ip || req.socket.remoteAddress,
+        userAgent: req.get('user-agent'),
+      }
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Expense voucher recorded successfully.',
+      data: result,
+    });
+  } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/income', async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
+    const result = await IncomeService.getIncome(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      req.query
+    );
+    res.json({ success: true, message: 'Income records retrieved.', data: result });
+  } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/income/:id', async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
+    const income = await IncomeService.getIncomeById(
+      req.params.id,
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] }
+    );
+    res.json({ success: true, message: 'Income details retrieved.', data: income });
+  } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(404).json({ success: false, message: error.message });
+  }
+});
+
+router.post('/income', async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
+    const { incomeDate, storeId, category, partyId, amount, paymentMethod, reference, description } = req.body;
+
+    const result = await IncomeService.createIncome(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      {
+        incomeDate,
+        storeId,
+        category,
+        partyId,
+        amount: Number(amount),
+        paymentMethod,
+        reference,
+        description,
+        ipAddress: req.ip || req.socket.remoteAddress,
+        userAgent: req.get('user-agent'),
+      }
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Income voucher recorded successfully.',
+      data: result,
+    });
+  } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(400).json({ success: false, message: error.message });
   }
 });
 
 // ==========================================
 // 9. DAY BOOK, CASH BOOK, BANK BOOK
 // ==========================================
-router.get('/day-book', async (_req: Request, res: Response) => {
+router.get('/day-book', async (req: Request, res: Response) => {
   try {
-    const transactions = await prisma.journalEntry.findMany({
-      take: 20,
-      orderBy: { entryDate: 'desc' },
-      include: {
-        lines: { include: { account: true, party: true } },
-      },
-    });
+    const user = req.user!;
+    const result = await BooksService.getDayBook(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      req.query
+    );
     res.json({
       success: true,
-      message: 'Day Book transactions retrieved.',
-      data: { date: new Date().toISOString().split('T')[0], transactions },
+      message: 'Day Book transactions retrieved successfully.',
+      data: result,
     });
   } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-router.get('/cash-book', async (_req: Request, res: Response) => {
+router.get('/cash-book', async (req: Request, res: Response) => {
   try {
-    const cashAccount = await prisma.ledgerAccount.findUnique({
-      where: { code: '1010' },
-    });
-    const lines = cashAccount
-      ? await prisma.journalEntryLine.findMany({
-          where: { accountId: cashAccount.id },
-          include: { journalEntry: true, party: true },
-          take: 50,
-          orderBy: { journalEntry: { entryDate: 'desc' } },
-        })
-      : [];
-    const lineAgg = cashAccount
-      ? await prisma.journalEntryLine.aggregate({
-          where: { accountId: cashAccount.id },
-          _sum: { debitAmount: true, creditAmount: true },
-        })
-      : { _sum: { debitAmount: 0, creditAmount: 0 } };
-    const balance = (lineAgg._sum.debitAmount || 0) - (lineAgg._sum.creditAmount || 0);
-
+    const user = req.user!;
+    const result = await BooksService.getCashBook(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      req.query
+    );
     res.json({
       success: true,
-      message: 'Cash Book ledger entries retrieved.',
-      data: {
-        cashAccountCode: '1010',
-        balance: balance !== 0 ? balance : 54200,
-        entries: lines,
-      },
+      message: 'Cash Book ledger calculated successfully.',
+      data: result,
     });
   } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-router.get('/bank-book', async (_req: Request, res: Response) => {
+router.get('/bank-book', async (req: Request, res: Response) => {
   try {
-    const bankAccount = await prisma.ledgerAccount.findUnique({
-      where: { code: '1020' },
-    });
-    const lines = bankAccount
-      ? await prisma.journalEntryLine.findMany({
-          where: { accountId: bankAccount.id },
-          include: { journalEntry: true, party: true },
-          take: 50,
-          orderBy: { journalEntry: { entryDate: 'desc' } },
-        })
-      : [];
-    const lineAgg = bankAccount
-      ? await prisma.journalEntryLine.aggregate({
-          where: { accountId: bankAccount.id },
-          _sum: { debitAmount: true, creditAmount: true },
-        })
-      : { _sum: { debitAmount: 0, creditAmount: 0 } };
-    const balance = (lineAgg._sum.debitAmount || 0) - (lineAgg._sum.creditAmount || 0);
-
+    const user = req.user!;
+    const result = await BooksService.getBankBook(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      req.query
+    );
     res.json({
       success: true,
-      message: 'Bank Book ledger entries retrieved.',
-      data: {
-        bankAccountCode: '1020',
-        balance: balance !== 0 ? balance : 1190800,
-        entries: lines,
-      },
+      message: 'Bank Book ledger calculated successfully.',
+      data: result,
     });
   } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
 // ==========================================
-// 10. ACCOUNTING REPORTS & SETTINGS
+// 10. ACCOUNTING REPORTS & LIVE ANALYTICS
 // ==========================================
 router.get('/reports', async (_req: Request, res: Response) => {
   res.json({
     success: true,
-    message: 'Accounting reports module ready.',
+    message: 'Accounting reports catalog retrieved.',
     data: {
       availableReports: [
-        'Trial Balance',
-        'Profit & Loss Statement',
-        'Balance Sheet',
-        'GST GSTR-2B Reconciliation',
-        'Party Outstanding Aging',
+        { id: 'PARTY_LEDGER', title: 'Party Ledger', category: 'Ledgers & Statements', desc: 'Chronological party statement with running balances' },
+        { id: 'PURCHASE_REPORT', title: 'Purchase Report', category: 'Purchases & Inward', desc: 'Comprehensive record of all purchase transactions' },
+        { id: 'PURCHASE_WITH_PO', title: 'Purchase With PO', category: 'Purchases & Inward', desc: 'Purchases linked to approved purchase orders' },
+        { id: 'PURCHASE_WITHOUT_PO', title: 'Purchase Without PO', category: 'Purchases & Inward', desc: 'Direct purchase bills booked without purchase orders' },
+        { id: 'PAYABLE_REPORT', title: 'Payable Report', category: 'Trade Obligations', desc: 'Outstanding supplier bills and aging schedule' },
+        { id: 'RECEIVABLE_REPORT', title: 'Receivable Report', category: 'Trade Obligations', desc: 'Customer trade receivables and overdue collections' },
+        { id: 'PAYMENT_REPORT', title: 'Payment Report', category: 'Cash & Banking', desc: 'Vendor disbursements, bank transfers, and cheques' },
+        { id: 'RECEIPT_REPORT', title: 'Receipt Report', category: 'Cash & Banking', desc: 'Customer collections, wire transfers, and deposits' },
+        { id: 'EXPENSE_REPORT', title: 'Expense Report', category: 'Operating Accounts', desc: 'Operating expenditure, utilities, payroll, and logistics' },
+        { id: 'INCOME_REPORT', title: 'Income Report', category: 'Operating Accounts', desc: 'Direct sales revenue, auxiliary, and scrap income' },
+        { id: 'DAY_BOOK', title: 'Day Book', category: 'Statutory Books', desc: 'Chronological double-entry journal audit log' },
+        { id: 'CASH_BOOK', title: 'Cash Book', category: 'Statutory Books', desc: 'Physical cash register (1010) with running balance' },
+        { id: 'BANK_BOOK', title: 'Bank Book', category: 'Statutory Books', desc: 'Operating bank register (1020) with running balance' },
+        { id: 'STORE_WISE', title: 'Store-wise Accounting Report', category: 'Management Financials', desc: 'Multi-branch comparative financial performance' },
       ],
     },
   });
+});
+
+router.get('/reports/generate', async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
+    const result = await ReportsService.generateReport(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      req.query as any
+    );
+    res.json({
+      success: true,
+      message: `${result.reportTitle} generated successfully.`,
+      data: result,
+    });
+  } catch (error: any) {
+    if (error instanceof AccountsSecurityError || error.name === 'AccountsSecurityError' || error.statusCode) {
+      res.status(error.statusCode || 403).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/reports/export', async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
+    const format = ((req.query.format as string) || 'CSV').toUpperCase();
+    const result = await ReportsService.generateReport(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      req.query as any
+    );
+
+    await AuditService.record({
+      userId: user.id,
+      action: 'EXPORT',
+      entity: 'Report',
+      entityId: (req.query.reportType as string) || 'ACCOUNTING_REPORT',
+      newValues: {
+        format,
+        reportType: req.query.reportType,
+        recordCount: result.records?.length || 0,
+        filters: req.query,
+      },
+      ipAddress: req.ip || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({
+      success: true,
+      message: `${result.reportTitle} exported successfully as ${format}.`,
+      data: result,
+      format,
+    });
+  } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/dashboard-analytics', async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
+    const result = await ReportsService.getDashboardAnalytics({
+      id: user.id,
+      role: user.role,
+      storeIds: user.storeIds || [],
+    });
+    res.json({
+      success: true,
+      message: 'Live accounts dashboard analytics calculated.',
+      data: result,
+    });
+  } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
 router.get('/settings', async (_req: Request, res: Response) => {

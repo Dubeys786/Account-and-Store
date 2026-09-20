@@ -27,9 +27,13 @@ export class InwardService {
     return `INW-${year}-${seq}`;
   }
 
-  static async getMaterialInwards(filters: { storeId?: string; poId?: string } = {}) {
+  static async getMaterialInwards(filters: { storeId?: string; storeIds?: string[]; poId?: string } = {}) {
     const where: any = {};
-    if (filters.storeId) where.storeId = filters.storeId;
+    if (filters.storeId) {
+      where.storeId = filters.storeId;
+    } else if (filters.storeIds && filters.storeIds.length > 0) {
+      where.storeId = { in: filters.storeIds };
+    }
     if (filters.poId) where.poId = filters.poId;
 
     return prisma.materialInward.findMany({

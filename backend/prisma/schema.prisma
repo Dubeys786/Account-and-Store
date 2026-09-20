@@ -323,6 +323,8 @@ model Party {
   payments               Payment[]
   receipts               Receipt[]
   journalLines           JournalEntryLine[]
+  expenses               Expense[]
+  income                 Income[]
 
   @@index([type])
   @@index([status])
@@ -473,8 +475,10 @@ model Expense {
   expenseDate   DateTime    @default(now())
   storeId       String
   accountId     String      // Expense Ledger Account
+  partyId       String?     // Optional vendor / contractor / employee
   amount        Float
   paymentMode   PaymentMode @default(CASH)
+  referenceNo   String?     // Voucher / bill / transaction reference
   category      String
   description   String?
   createdAt     DateTime    @default(now())
@@ -482,9 +486,11 @@ model Expense {
 
   store   Store         @relation(fields: [storeId], references: [id])
   account LedgerAccount @relation(fields: [accountId], references: [id])
+  party   Party?        @relation(fields: [partyId], references: [id])
 
   @@index([storeId])
   @@index([accountId])
+  @@index([partyId])
   @@map("expenses")
 }
 
@@ -494,8 +500,10 @@ model Income {
   incomeDate   DateTime    @default(now())
   storeId      String
   accountId    String      // Income Ledger Account
+  partyId      String?     // Optional client / payer
   amount       Float
   paymentMode  PaymentMode @default(BANK_TRANSFER)
+  referenceNo  String?     // Receipt / challan / UTR reference
   category     String
   description  String?
   createdAt    DateTime    @default(now())
@@ -503,9 +511,11 @@ model Income {
 
   store   Store         @relation(fields: [storeId], references: [id])
   account LedgerAccount @relation(fields: [accountId], references: [id])
+  party   Party?        @relation(fields: [partyId], references: [id])
 
   @@index([storeId])
   @@index([accountId])
+  @@index([partyId])
   @@map("income")
 }
 

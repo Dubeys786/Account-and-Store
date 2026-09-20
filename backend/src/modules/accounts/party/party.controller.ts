@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { PartyService } from './party.service';
 import { validatePartyAccess, validateStoreAccess, AccountsSecurityError } from '../accounts.guard';
 import { UserRole } from '@prisma/client';
+import { AuditService } from '../../audit/audit.service';
 
 export class PartyController {
   /**
@@ -16,6 +17,17 @@ export class PartyController {
       }
 
       const party = await PartyService.createParty(req.body);
+
+      await AuditService.record({
+        userId: req.user?.id,
+        action: 'CREATE',
+        entity: 'Party',
+        entityId: party.id,
+        newValues: { code: party.code, name: party.name, type: party.type, storeId: party.storeId },
+        ipAddress: req.ip || req.socket.remoteAddress,
+        userAgent: req.headers['user-agent'],
+      });
+
       res.status(201).json({
         success: true,
         message: 'Party master record created successfully.',

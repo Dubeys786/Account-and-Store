@@ -128,6 +128,7 @@ export const prisma = prismaClient;
  */
 export async function initDatabase(): Promise<void> {
   try {
+    await pglite.waitReady;
     console.log('🔍 Checking database connectivity and schema...');
 
     const res = await pglite.query<{ count: string }>(
@@ -182,6 +183,19 @@ export async function initDatabase(): Promise<void> {
       } else {
         console.warn('⚠️  Could not locate Phase 3 migration.sql file');
       }
+    }
+
+    // Phase 8: Ensure partyId and referenceNo columns exist on expenses and income
+    try {
+      await pglite.exec(`
+        ALTER TABLE "expenses" ADD COLUMN IF NOT EXISTS "partyId" TEXT REFERENCES "parties"("id");
+        ALTER TABLE "expenses" ADD COLUMN IF NOT EXISTS "referenceNo" TEXT;
+        ALTER TABLE "income" ADD COLUMN IF NOT EXISTS "partyId" TEXT REFERENCES "parties"("id");
+        ALTER TABLE "income" ADD COLUMN IF NOT EXISTS "referenceNo" TEXT;
+      `);
+      console.log('✅ Phase 8 accounting operations schema verified (expenses & income columns)');
+    } catch (e: any) {
+      console.warn('Phase 8 schema column check:', e.message || e);
     }
   } catch (err: any) {
     console.error('❌ Database bootstrap error:', err.message || err);

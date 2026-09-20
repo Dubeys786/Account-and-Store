@@ -1,4 +1,4 @@
-import { UserRole, PartyType, AccountGroup, BalanceType, PartyStatus, POStatus } from '@prisma/client';
+import { UserRole, PartyType, AccountGroup, BalanceType, PartyStatus, POStatus, TransactionType, PaymentStatus } from '@prisma/client';
 import { prisma, initDatabase } from './db';
 import bcrypt from 'bcryptjs';
 
@@ -85,7 +85,6 @@ export async function seedDatabase() {
       storeUsers: {
         create: [
           { storeId: mainStore.id, isDefault: true },
-          { storeId: branchStore.id, isDefault: false },
         ],
       },
     },
@@ -499,10 +498,9 @@ export async function seedDatabase() {
   // 8. Seed Sales Accounting Transactions for Receivables aging & tracking
   if (customer1 && mainStore) {
     await prisma.accountingTransaction.upsert({
-      where: { transactionNumber: 'TXN-SALE-2026-0001' },
+      where: { invoiceNumber: 'INV-SALE-2026-001' },
       update: {},
       create: {
-        transactionNumber: 'TXN-SALE-2026-0001',
         transactionType: TransactionType.SALE,
         invoiceNumber: 'INV-SALE-2026-001',
         invoiceDate: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000),
@@ -510,7 +508,6 @@ export async function seedDatabase() {
         partyId: customer1.id,
         storeId: mainStore.id,
         grossAmount: 180000,
-        discountAmount: 0,
         taxAmount: 32400,
         netAmount: 212400,
         paidAmount: 50000,
@@ -520,23 +517,67 @@ export async function seedDatabase() {
     });
 
     await prisma.accountingTransaction.upsert({
-      where: { transactionNumber: 'TXN-SALE-2026-0002' },
+      where: { invoiceNumber: 'INV-SALE-2026-002' },
       update: {},
       create: {
-        transactionNumber: 'TXN-SALE-2026-0002',
         transactionType: TransactionType.SALE,
         invoiceNumber: 'INV-SALE-2026-002',
         invoiceDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
         dueDate: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000),
         partyId: customer1.id,
         storeId: mainStore.id,
-        grossAmount: 95000,
-        discountAmount: 5000,
+        grossAmount: 90000,
         taxAmount: 16200,
         netAmount: 106200,
         paidAmount: 0,
         paymentStatus: PaymentStatus.UNPAID,
         notes: 'Batch shipment of high load bearings',
+      },
+    });
+  }
+
+  // 9. Seed Purchase Accounting Transactions for Payables aging & tracking
+  if (sup1 && mainStore) {
+    const po1 = await prisma.purchaseOrder.findUnique({ where: { poNumber: 'PO-2026-0001' } });
+    await prisma.accountingTransaction.upsert({
+      where: { invoiceNumber: 'INV-BST-2026-001' },
+      update: {},
+      create: {
+        transactionType: TransactionType.PURCHASE_WITH_PO,
+        invoiceNumber: 'INV-BST-2026-001',
+        invoiceDate: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000),
+        dueDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+        partyId: sup1.id,
+        storeId: mainStore.id,
+        poId: po1?.id || null,
+        grossAmount: 47554,
+        taxAmount: 7254,
+        netAmount: 47554,
+        paidAmount: 20000,
+        paymentStatus: PaymentStatus.PARTIALLY_PAID,
+        notes: 'Monthly bulk steel beams & ball bearings requisition',
+      },
+    });
+  }
+
+  if (sup2 && mainStore) {
+    await prisma.accountingTransaction.upsert({
+      where: { invoiceNumber: 'INV-DIR-2026-008' },
+      update: {},
+      create: {
+        transactionType: TransactionType.PURCHASE_WITHOUT_PO,
+        invoiceNumber: 'INV-DIR-2026-008',
+        invoiceDate: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000),
+        dueDate: new Date(Date.now() + 18 * 24 * 60 * 60 * 1000),
+        partyId: sup2.id,
+        storeId: mainStore.id,
+        poId: null,
+        grossAmount: 35000,
+        taxAmount: 6300,
+        netAmount: 41300,
+        paidAmount: 0,
+        paymentStatus: PaymentStatus.UNPAID,
+        notes: 'Direct workshop lubricant supplies',
       },
     });
   }

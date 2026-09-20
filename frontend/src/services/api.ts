@@ -3,7 +3,7 @@ const API_BASE_URL = '/api/v1';
 export async function apiRequest<T = any>(
   endpoint: string,
   options: RequestInit = {}
-): Promise<{ success: boolean; data?: T; message?: string; error?: any; meta?: any }> {
+): Promise<{ success: boolean; data?: T; message?: string; error?: any; meta?: any; summary?: any; [key: string]: any }> {
   const token = localStorage.getItem('prozen_token');
   const activeStoreId = localStorage.getItem('prozen_active_store_id');
 

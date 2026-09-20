@@ -97,4 +97,32 @@ export class TransactionController {
       res.status(404).json({ success: false, message: error.message });
     }
   }
+
+  /**
+   * POST /api/v1/accounts/transactions/:id/void
+   * Non-destructively void/reverse a transaction with balanced reversing journal entry
+   */
+  static async voidTransaction(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    try {
+      const user = req.user!;
+      const { reason } = req.body;
+      const result = await TransactionService.voidTransaction(
+        req.params.id,
+        { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+        reason
+      );
+
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result,
+      });
+    } catch (error: any) {
+      if (error instanceof AccountsSecurityError) {
+        res.status(error.statusCode).json({ success: false, message: error.message });
+        return;
+      }
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
 }

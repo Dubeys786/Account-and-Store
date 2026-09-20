@@ -26,9 +26,13 @@ export class POService {
     return `PO-${year}-${seq}`;
   }
 
-  static async getPurchaseOrders(filters: { storeId?: string; status?: POStatus; partyId?: string } = {}) {
+  static async getPurchaseOrders(filters: { storeId?: string; storeIds?: string[]; status?: POStatus; partyId?: string } = {}) {
     const where: any = {};
-    if (filters.storeId) where.storeId = filters.storeId;
+    if (filters.storeId) {
+      where.storeId = filters.storeId;
+    } else if (filters.storeIds && filters.storeIds.length > 0) {
+      where.storeId = { in: filters.storeIds };
+    }
     if (filters.status) where.status = filters.status;
     if (filters.partyId) where.partyId = filters.partyId;
 
