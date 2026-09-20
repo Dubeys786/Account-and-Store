@@ -389,75 +389,87 @@ export const AccountsDashboardPage: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent className="p-4">
-              <div className="h-64 flex items-end justify-between gap-4 pt-4 pb-2 px-2">
-                {analytics?.monthlySeries.map((month) => {
-                  const pHeight = Math.max(4, Math.round((month.purchases / maxMonthlyVal) * 200));
-                  const eHeight = Math.max(4, Math.round((month.expenses / maxMonthlyVal) * 200));
-                  const iHeight = Math.max(4, Math.round((month.income / maxMonthlyVal) * 200));
-                  const rHeight = Math.max(4, Math.round((month.receipts / maxMonthlyVal) * 200));
-                  const payHeight = Math.max(4, Math.round((month.payments / maxMonthlyVal) * 200));
+              {!analytics?.monthlySeries.some((m) => m.purchases > 0 || m.expenses > 0 || m.income > 0 || m.receipts > 0 || m.payments > 0) ? (
+                <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-slate-400">
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
+                    <BarChart3 className="w-6 h-6" />
+                  </div>
+                  <p className="text-xs font-semibold text-slate-600">No financial data available yet</p>
+                  <p className="text-[11px] text-slate-400 mt-1 max-w-sm">
+                    Book purchase vouchers, expenses, or payments to generate live monthly cash flow trends.
+                  </p>
+                </div>
+              ) : (
+                <div className="h-64 flex items-end justify-between gap-4 pt-4 pb-2 px-2">
+                  {analytics?.monthlySeries.map((month) => {
+                    const pHeight = month.purchases > 0 ? Math.max(4, Math.round((month.purchases / maxMonthlyVal) * 200)) : 0;
+                    const eHeight = month.expenses > 0 ? Math.max(4, Math.round((month.expenses / maxMonthlyVal) * 200)) : 0;
+                    const iHeight = month.income > 0 ? Math.max(4, Math.round((month.income / maxMonthlyVal) * 200)) : 0;
+                    const rHeight = month.receipts > 0 ? Math.max(4, Math.round((month.receipts / maxMonthlyVal) * 200)) : 0;
+                    const payHeight = month.payments > 0 ? Math.max(4, Math.round((month.payments / maxMonthlyVal) * 200)) : 0;
 
-                  return (
-                    <div key={month.monthKey} className="flex-1 flex flex-col items-center gap-2 group relative">
-                      {/* Tooltip on hover */}
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-16 bg-slate-900 text-white text-[10px] p-2 rounded-lg shadow-lg pointer-events-none z-20 whitespace-nowrap">
-                        <p className="font-bold">{month.label}</p>
-                        {activeChartTab === 'OPERATIONS' ? (
-                          <>
-                            <p className="text-blue-300">Purchases: ₹ {month.purchases.toLocaleString()}</p>
-                            <p className="text-rose-300">Expenses: ₹ {month.expenses.toLocaleString()}</p>
-                            <p className="text-emerald-300">Income: ₹ {month.income.toLocaleString()}</p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-emerald-300">Receipts: ₹ {month.receipts.toLocaleString()}</p>
-                            <p className="text-rose-300">Payments: ₹ {month.payments.toLocaleString()}</p>
-                          </>
-                        )}
+                    return (
+                      <div key={month.monthKey} className="flex-1 flex flex-col items-center gap-2 group relative">
+                        {/* Tooltip on hover */}
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-16 bg-slate-900 text-white text-[10px] p-2 rounded-lg shadow-lg pointer-events-none z-20 whitespace-nowrap">
+                          <p className="font-bold">{month.label}</p>
+                          {activeChartTab === 'OPERATIONS' ? (
+                            <>
+                              <p className="text-blue-300">Purchases: ₹ {month.purchases.toLocaleString()}</p>
+                              <p className="text-rose-300">Expenses: ₹ {month.expenses.toLocaleString()}</p>
+                              <p className="text-emerald-300">Income: ₹ {month.income.toLocaleString()}</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-emerald-300">Receipts: ₹ {month.receipts.toLocaleString()}</p>
+                              <p className="text-rose-300">Payments: ₹ {month.payments.toLocaleString()}</p>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Bar Group */}
+                        <div className="w-full flex items-end justify-center gap-1.5 h-48 border-b border-slate-100">
+                          {activeChartTab === 'OPERATIONS' ? (
+                            <>
+                              <div
+                                style={{ height: `${pHeight}px` }}
+                                className="w-3 sm:w-4 bg-blue-500 hover:bg-blue-600 rounded-t-sm transition-all"
+                                title={`Purchases: ₹ ${month.purchases}`}
+                              />
+                              <div
+                                style={{ height: `${eHeight}px` }}
+                                className="w-3 sm:w-4 bg-rose-500 hover:bg-rose-600 rounded-t-sm transition-all"
+                                title={`Expenses: ₹ ${month.expenses}`}
+                              />
+                              <div
+                                style={{ height: `${iHeight}px` }}
+                                className="w-3 sm:w-4 bg-emerald-500 hover:bg-emerald-600 rounded-t-sm transition-all"
+                                title={`Income: ₹ ${month.income}`}
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <div
+                                style={{ height: `${rHeight}px` }}
+                                className="w-4 sm:w-6 bg-emerald-500 hover:bg-emerald-600 rounded-t-sm transition-all"
+                                title={`Receipts: ₹ ${month.receipts}`}
+                              />
+                              <div
+                                style={{ height: `${payHeight}px` }}
+                                className="w-4 sm:w-6 bg-rose-500 hover:bg-rose-600 rounded-t-sm transition-all"
+                                title={`Payments: ₹ ${month.payments}`}
+                              />
+                            </>
+                          )}
+                        </div>
+
+                        {/* Month Label */}
+                        <span className="text-[11px] font-semibold text-slate-600">{month.label}</span>
                       </div>
-
-                      {/* Bar Group */}
-                      <div className="w-full flex items-end justify-center gap-1.5 h-48 border-b border-slate-100">
-                        {activeChartTab === 'OPERATIONS' ? (
-                          <>
-                            <div
-                              style={{ height: `${pHeight}px` }}
-                              className="w-3 sm:w-4 bg-blue-500 hover:bg-blue-600 rounded-t-sm transition-all"
-                              title={`Purchases: ₹ ${month.purchases}`}
-                            />
-                            <div
-                              style={{ height: `${eHeight}px` }}
-                              className="w-3 sm:w-4 bg-rose-500 hover:bg-rose-600 rounded-t-sm transition-all"
-                              title={`Expenses: ₹ ${month.expenses}`}
-                            />
-                            <div
-                              style={{ height: `${iHeight}px` }}
-                              className="w-3 sm:w-4 bg-emerald-500 hover:bg-emerald-600 rounded-t-sm transition-all"
-                              title={`Income: ₹ ${month.income}`}
-                            />
-                          </>
-                        ) : (
-                          <>
-                            <div
-                              style={{ height: `${rHeight}px` }}
-                              className="w-4 sm:w-6 bg-emerald-500 hover:bg-emerald-600 rounded-t-sm transition-all"
-                              title={`Receipts: ₹ ${month.receipts}`}
-                            />
-                            <div
-                              style={{ height: `${payHeight}px` }}
-                              className="w-4 sm:w-6 bg-rose-500 hover:bg-rose-600 rounded-t-sm transition-all"
-                              title={`Payments: ₹ ${month.payments}`}
-                            />
-                          </>
-                        )}
-                      </div>
-
-                      {/* Month Label */}
-                      <span className="text-[11px] font-semibold text-slate-600">{month.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -468,56 +480,71 @@ export const AccountsDashboardPage: React.FC = () => {
               <p className="text-[10px] text-slate-400">Total Outstanding Payables vs Receivables</p>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
-              {/* Payables Bar */}
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="font-semibold text-slate-700 flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500" /> Outstanding Payables
-                  </span>
-                  <span className="font-mono font-bold text-rose-600">
-                    ₹ {Number(analytics?.totals.payables || metrics?.totalPayables || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
+              {(Number(analytics?.totals.payables || metrics?.totalPayables || 0) === 0 &&
+                Number(analytics?.totals.receivables || metrics?.totalReceivables || 0) === 0) ? (
+                <div className="py-10 flex flex-col items-center justify-center text-center text-slate-400">
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
+                    <Scale className="w-6 h-6" />
+                  </div>
+                  <p className="text-xs font-semibold text-slate-600">No outstanding trade liabilities</p>
+                  <p className="text-[11px] text-slate-400 mt-1 max-w-xs">
+                    Both trade payables and customer receivables are ₹ 0.00.
+                  </p>
                 </div>
-                <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                  <div
-                    className="bg-rose-500 h-2.5 rounded-full transition-all duration-500"
-                    style={{
-                      width: `${Math.min(100, Math.max(10, Math.round(((analytics?.totals.payables || 1) / ((analytics?.totals.payables || 0) + (analytics?.totals.receivables || 1))) * 100)))}%`,
-                    }}
-                  />
-                </div>
-              </div>
+              ) : (
+                <>
+                  {/* Payables Bar */}
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500" /> Outstanding Payables
+                      </span>
+                      <span className="font-mono font-bold text-rose-600">
+                        ₹ {Number(analytics?.totals.payables || metrics?.totalPayables || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                      <div
+                        className="bg-rose-500 h-2.5 rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.min(100, Math.max(10, Math.round(((analytics?.totals.payables || 1) / ((analytics?.totals.payables || 0) + (analytics?.totals.receivables || 1))) * 100)))}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
 
-              {/* Receivables Bar */}
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="font-semibold text-slate-700 flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Outstanding Receivables
-                  </span>
-                  <span className="font-mono font-bold text-emerald-600">
-                    ₹ {Number(analytics?.totals.receivables || metrics?.totalReceivables || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                  <div
-                    className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500"
-                    style={{
-                      width: `${Math.min(100, Math.max(10, Math.round(((analytics?.totals.receivables || 1) / ((analytics?.totals.payables || 1) + (analytics?.totals.receivables || 0))) * 100)))}%`,
-                    }}
-                  />
-                </div>
-              </div>
+                  {/* Receivables Bar */}
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Outstanding Receivables
+                      </span>
+                      <span className="font-mono font-bold text-emerald-600">
+                        ₹ {Number(analytics?.totals.receivables || metrics?.totalReceivables || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                      <div
+                        className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.min(100, Math.max(10, Math.round(((analytics?.totals.receivables || 1) / ((analytics?.totals.payables || 1) + (analytics?.totals.receivables || 0))) * 100)))}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
 
-              {/* Net Working Capital Card */}
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 mt-4">
-                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Net Trade Position</span>
-                <p className="text-lg font-mono font-bold text-slate-900 mt-0.5">
-                  ₹ {Math.abs((analytics?.totals.receivables || 0) - (analytics?.totals.payables || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  <span className="text-xs font-normal text-slate-500 ml-1.5">
-                    {(analytics?.totals.receivables || 0) >= (analytics?.totals.payables || 0) ? '(Net Asset / Receivable)' : '(Net Liability / Payable)'}
-                  </span>
-                </p>
-              </div>
+                  {/* Net Working Capital Card */}
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 mt-4">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Net Trade Position</span>
+                    <p className="text-lg font-mono font-bold text-slate-900 mt-0.5">
+                      ₹ {Math.abs((analytics?.totals.receivables || 0) - (analytics?.totals.payables || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      <span className="text-xs font-normal text-slate-500 ml-1.5">
+                        {(analytics?.totals.receivables || 0) >= (analytics?.totals.payables || 0) ? '(Net Asset / Receivable)' : '(Net Liability / Payable)'}
+                      </span>
+                    </p>
+                  </div>
+                </>
+              )}
 
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
                 <Link to="/accounts/payables" className="text-rose-600 font-semibold hover:underline">

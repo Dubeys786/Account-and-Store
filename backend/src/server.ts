@@ -11,18 +11,8 @@ async function startServer() {
     // 1. Initialize and verify PostgreSQL schema
     await initDatabase();
 
-    // 2. Check if default admin user exists; if not, run automatic seed
-    const userCount = await prisma.user.count();
-    if (userCount === 0) {
-      logger.info('🌱 Empty database detected. Auto-seeding initial users and chart of accounts...');
-      await seedDatabase();
-    } else {
-      logger.info(`✅ Database ready with ${userCount} registered system users.`);
-    }
-
-    // 3. Ensure RBAC roles and permissions exist in database
-    const { seedRbacSystem } = await import('./config/rbac-seed');
-    await seedRbacSystem();
+    // 2. Ensure essential stores, system accounts, and RBAC system exist
+    await seedDatabase();
 
     // 3. Start Express HTTP Server
     const server = app.listen(env.PORT, () => {
