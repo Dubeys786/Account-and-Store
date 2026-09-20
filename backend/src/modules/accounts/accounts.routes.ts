@@ -10,6 +10,10 @@ import { TransactionController } from './transaction/transaction.controller';
 import { LedgerController } from './ledger/ledger.controller';
 import { LedgerService } from './ledger/ledger.service';
 import { PurchaseAccountingService } from './purchase/purchase-accounting.service';
+import { PaymentService } from './payment/payment.service';
+import { ReceiptService } from './receipt/receipt.service';
+import { PayablesService } from './payables/payables.service';
+import { ReceivablesService } from './receivables/receivables.service';
 import { AccountsSecurityError } from './accounts.guard';
 
 const router = Router();

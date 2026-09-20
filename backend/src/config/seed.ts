@@ -496,5 +496,50 @@ export async function seedDatabase() {
     });
   }
 
+  // 8. Seed Sales Accounting Transactions for Receivables aging & tracking
+  if (customer1 && mainStore) {
+    await prisma.accountingTransaction.upsert({
+      where: { transactionNumber: 'TXN-SALE-2026-0001' },
+      update: {},
+      create: {
+        transactionNumber: 'TXN-SALE-2026-0001',
+        transactionType: TransactionType.SALE,
+        invoiceNumber: 'INV-SALE-2026-001',
+        invoiceDate: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000),
+        dueDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+        partyId: customer1.id,
+        storeId: mainStore.id,
+        grossAmount: 180000,
+        discountAmount: 0,
+        taxAmount: 32400,
+        netAmount: 212400,
+        paidAmount: 50000,
+        paymentStatus: PaymentStatus.PARTIALLY_PAID,
+        notes: 'Supply of structural steel fabrication sections',
+      },
+    });
+
+    await prisma.accountingTransaction.upsert({
+      where: { transactionNumber: 'TXN-SALE-2026-0002' },
+      update: {},
+      create: {
+        transactionNumber: 'TXN-SALE-2026-0002',
+        transactionType: TransactionType.SALE,
+        invoiceNumber: 'INV-SALE-2026-002',
+        invoiceDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+        dueDate: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000),
+        partyId: customer1.id,
+        storeId: mainStore.id,
+        grossAmount: 95000,
+        discountAmount: 5000,
+        taxAmount: 16200,
+        netAmount: 106200,
+        paidAmount: 0,
+        paymentStatus: PaymentStatus.UNPAID,
+        notes: 'Batch shipment of high load bearings',
+      },
+    });
+  }
+
   console.log('🎉 PROZEN Store & Accounts database seeding completed successfully!');
 }
