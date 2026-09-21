@@ -46,7 +46,7 @@ export class RbacService {
 
     // Dynamic role matching based on database role assignments
     const hasStoreRole = roles.some((r) =>
-      ['STORE_INCHARGE', 'STORE_MANAGER', 'STORE_USER'].includes(r)
+      ['STORE_INCHARGE', 'STORE_MANAGER', 'STORE_USER', 'ACCOUNT_AND_STORE_INCHARGE'].includes(r)
     );
     const hasStorePerm = permissions.some(
       (p) =>

@@ -1,5 +1,9 @@
 import prisma from '../../../config/db';
 import { POStatus, StockTransactionType } from '@prisma/client';
+import {
+  calculateDaysHeld,
+  getReturnClassification,
+} from '../../../config/return-rules.config';
 
 export class StoreReportsService {
   static async getStockValuation() {
@@ -113,5 +117,84 @@ export class StoreReportsService {
       totalAccepted: s.accepted,
       rejectionRatePercent: s.received > 0 ? Math.round((s.rejected / s.received) * 10000) / 100 : 0,
     }));
+  }
+
+  static async getReturnAgeReport(storeId?: string) {
+    const where: any = { transactionType: StockTransactionType.RETURN };
+    if (storeId) where.storeId = storeId;
+
+    const returns = await prisma.stockTransaction.findMany({
+      where,
+      include: {
+        item: true,
+        store: true,
+        originalIssue: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let totalReturns = returns.length;
+    let totalReturnedQty = 0;
+    let recentCount = 0;
+    let oldCount = 0;
+    let veryOldCount = 0;
+    let totalDays = 0;
+    let validDaysCount = 0;
+
+    const records = returns.map((ret) => {
+      const issueDate = ret.originalIssue?.createdAt || ret.createdAt;
+      const returnDate = ret.returnDate || ret.createdAt;
+      const daysHeld =
+        ret.daysHeld !== null && ret.daysHeld !== undefined
+          ? ret.daysHeld
+          : calculateDaysHeld(issueDate, returnDate);
+
+      totalReturnedQty += ret.quantity;
+      totalDays += daysHeld;
+      validDaysCount++;
+
+      const classification = getReturnClassification(daysHeld);
+      if (classification.key === 'RECENT_RETURN') recentCount++;
+      else if (classification.key === 'OLD_RETURN') oldCount++;
+      else if (classification.key === 'VERY_OLD_RETURN') veryOldCount++;
+
+      return {
+        id: ret.id,
+        returnDate,
+        issueDate,
+        originalIssueId: ret.originalIssueId,
+        itemCode: ret.item.code,
+        itemName: ret.item.name,
+        category: ret.item.category,
+        unit: ret.item.unit,
+        storeCode: ret.store.code,
+        storeName: ret.store.name,
+        issuedQuantity: ret.originalIssue?.quantity ?? null,
+        returnedQuantity: ret.quantity,
+        issuedTo: ret.originalIssue?.referenceType || ret.referenceType || 'N/A',
+        referenceId: ret.referenceId,
+        daysHeld,
+        classificationKey: classification.key,
+        classificationLabel: classification.label,
+        badgeVariant: classification.badgeVariant,
+        condition: ret.condition || 'Good',
+        returnReason: ret.returnReason || 'Unused Material',
+        notes: ret.notes,
+      };
+    });
+
+    const avgDaysHeld = validDaysCount > 0 ? Math.round((totalDays / validDaysCount) * 10) / 10 : 0;
+
+    return {
+      summary: {
+        totalReturns,
+        totalReturnedQty,
+        recentCount,
+        oldCount,
+        veryOldCount,
+        avgDaysHeld,
+      },
+      records,
+    };
   }
 }

@@ -74,7 +74,7 @@ export const DashboardPage: React.FC = () => {
             <span className="font-semibold text-slate-700">{activeStore?.name || 'All Stores'}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <Link to="/store/items">
             <Button size="sm" variant="outline" icon={<Package className="w-3.5 h-3.5" />}>
               Item Master
@@ -94,7 +94,7 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* 6 Required Screenshot-Style Dashboard KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
         <StatsCard
           title="Total Items"
           value={cards.totalItems ?? 0}

@@ -21,6 +21,7 @@ import { ReportsService } from './reports/reports.service';
 import { AccountsSecurityError } from './accounts.guard';
 import { preventParameterTampering } from '../../middleware/security.middleware';
 import { AuditService } from '../audit/audit.service';
+import { NotificationService } from '../notification/notification.service';
 
 const router = Router();
 
@@ -543,6 +544,15 @@ router.post('/payments', async (req: Request, res: Response) => {
       }
     );
 
+    // Notify account users (non-blocking)
+    NotificationService.notifyAccountUsers({
+      title: 'Payment Recorded',
+      message: `Payment voucher ${result.payment.paymentNumber} of ₹${result.payment.amount.toLocaleString('en-IN')} recorded for ${result.payment.party?.name || 'Party'}.`,
+      type: 'ACCOUNTS',
+      referenceType: 'payment',
+      referenceId: result.payment.id,
+    }).catch(err => console.error('[Notification] Failed to notify payment:', err));
+
     res.status(201).json({
       success: true,
       message: 'Payment voucher recorded successfully.',
@@ -635,6 +645,15 @@ router.post('/receipts', async (req: Request, res: Response) => {
       }
     );
 
+    // Notify account users (non-blocking)
+    NotificationService.notifyAccountUsers({
+      title: 'Receipt Recorded',
+      message: `Receipt voucher ${result.receipt.receiptNumber} of ₹${result.receipt.amount.toLocaleString('en-IN')} recorded from ${result.receipt.party?.name || 'Party'}.`,
+      type: 'ACCOUNTS',
+      referenceType: 'receipt',
+      referenceId: result.receipt.id,
+    }).catch(err => console.error('[Notification] Failed to notify receipt:', err));
+
     res.status(201).json({
       success: true,
       message: 'Receipt voucher recorded successfully.',
@@ -707,6 +726,15 @@ router.post('/expenses', async (req: Request, res: Response) => {
       }
     );
 
+    // Notify account users (non-blocking)
+    NotificationService.notifyAccountUsers({
+      title: 'Expense Recorded',
+      message: `Expense voucher ${result.expense.expenseNumber} of ₹${result.expense.amount.toLocaleString('en-IN')} recorded for ${result.expense.category}.`,
+      type: 'ACCOUNTS',
+      referenceType: 'expense',
+      referenceId: result.expense.id,
+    }).catch(err => console.error('[Notification] Failed to notify expense:', err));
+
     res.status(201).json({
       success: true,
       message: 'Expense voucher recorded successfully.',
@@ -775,6 +803,15 @@ router.post('/income', async (req: Request, res: Response) => {
         userAgent: req.get('user-agent'),
       }
     );
+
+    // Notify account users (non-blocking)
+    NotificationService.notifyAccountUsers({
+      title: 'Income Recorded',
+      message: `Income voucher ${result.income.incomeNumber} of ₹${result.income.amount.toLocaleString('en-IN')} recorded for ${result.income.category}.`,
+      type: 'ACCOUNTS',
+      referenceType: 'income',
+      referenceId: result.income.id,
+    }).catch(err => console.error('[Notification] Failed to notify income:', err));
 
     res.status(201).json({
       success: true,

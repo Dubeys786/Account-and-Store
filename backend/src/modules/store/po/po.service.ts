@@ -18,12 +18,33 @@ export interface CreatePOInput {
   items: POLineItemInput[];
 }
 
+const round2 = (val: number): number => Math.round((val + Number.EPSILON) * 100) / 100;
+
 export class POService {
   static async generatePONumber(): Promise<string> {
     const year = new Date().getFullYear();
-    const count = await prisma.purchaseOrder.count();
-    const seq = (count + 1).toString().padStart(4, '0');
-    return `PO-${year}-${seq}`;
+    const prefix = `PO-${year}-`;
+    const lastPO = await prisma.purchaseOrder.findFirst({
+      where: {
+        poNumber: {
+          startsWith: prefix,
+        },
+      },
+      orderBy: {
+        poNumber: 'desc',
+      },
+    });
+
+    let nextSeq = 1;
+    if (lastPO && lastPO.poNumber) {
+      const parts = lastPO.poNumber.split('-');
+      const lastSeq = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(lastSeq)) {
+        nextSeq = lastSeq + 1;
+      }
+    }
+    const seqStr = nextSeq.toString().padStart(4, '0');
+    return `${prefix}${seqStr}`;
   }
 
   static async getPurchaseOrders(filters: { storeId?: string; storeIds?: string[]; status?: POStatus; partyId?: string } = {}) {
@@ -84,75 +105,80 @@ export class POService {
       throw new Error('Purchase Order must contain at least one line item.');
     }
 
-    const party = await prisma.party.findUnique({ where: { id: data.partyId } });
-    if (!party) throw new Error('Supplier / Party does not exist.');
-
-    const store = await prisma.store.findUnique({ where: { id: data.storeId } });
-    if (!store) throw new Error('Store does not exist.');
-
     const poNumber = data.poNumber || (await this.generatePONumber());
 
-    // Calculate line items and totals
-    let subtotal = 0;
-    let totalDiscount = 0;
-    let totalTax = 0;
+    return prisma.$transaction(
+      async (tx) => {
+        const party = await tx.party.findUnique({ where: { id: data.partyId } });
+        if (!party) throw new Error('Supplier / Party does not exist.');
 
-    const computedItems = [];
+        const store = await tx.store.findUnique({ where: { id: data.storeId } });
+        if (!store) throw new Error('Store does not exist.');
 
-    for (const line of data.items) {
-      if (line.quantity <= 0) throw new Error('Quantity must be greater than 0.');
-      if (line.rate < 0) throw new Error('Rate cannot be negative.');
+        // Calculate line items and totals with decimal-safe precision
+        let subtotal = 0;
+        let totalDiscount = 0;
+        let totalTax = 0;
 
-      const discPct = line.discountPercent || 0;
-      const taxPct = line.taxPercent || 0;
+        const computedItems = [];
 
-      const baseAmount = line.quantity * line.rate;
-      const discount = baseAmount * (discPct / 100);
-      const taxable = baseAmount - discount;
-      const tax = taxable * (taxPct / 100);
-      const total = taxable + tax;
+        for (const line of data.items) {
+          if (line.quantity <= 0) throw new Error('Quantity must be greater than 0.');
+          if (line.rate < 0) throw new Error('Rate cannot be negative.');
 
-      subtotal += baseAmount;
-      totalDiscount += discount;
-      totalTax += tax;
+          const discPct = line.discountPercent || 0;
+          const taxPct = line.taxPercent || 0;
 
-      computedItems.push({
-        itemId: line.itemId,
-        quantity: line.quantity,
-        rate: line.rate,
-        discountPercent: discPct,
-        taxPercent: taxPct,
-        total: Math.round(total * 100) / 100,
-        receivedQty: 0,
-      });
-    }
+          const baseAmount = round2(line.quantity * line.rate);
+          const discount = round2(baseAmount * (discPct / 100));
+          const taxable = round2(baseAmount - discount);
+          const tax = round2(taxable * (taxPct / 100));
+          const total = round2(taxable + tax);
 
-    const grandTotal = subtotal - totalDiscount + totalTax;
+          subtotal = round2(subtotal + baseAmount);
+          totalDiscount = round2(totalDiscount + discount);
+          totalTax = round2(totalTax + tax);
 
-    const purchaseOrder = await prisma.purchaseOrder.create({
-      data: {
-        poNumber,
-        partyId: data.partyId,
-        storeId: data.storeId,
-        expectedDelivery: data.expectedDelivery ? new Date(data.expectedDelivery) : null,
-        status: POStatus.APPROVED, // Default approved for direct PO workflow
-        subtotal: Math.round(subtotal * 100) / 100,
-        discount: Math.round(totalDiscount * 100) / 100,
-        taxAmount: Math.round(totalTax * 100) / 100,
-        totalAmount: Math.round(grandTotal * 100) / 100,
-        notes: data.notes || null,
-        items: {
-          create: computedItems,
-        },
+          computedItems.push({
+            itemId: line.itemId,
+            quantity: line.quantity,
+            rate: line.rate,
+            discountPercent: discPct,
+            taxPercent: taxPct,
+            total,
+            receivedQty: 0,
+          });
+        }
+
+        const grandTotal = round2(subtotal - totalDiscount + totalTax);
+
+        const purchaseOrder = await tx.purchaseOrder.create({
+          data: {
+            poNumber,
+            partyId: data.partyId,
+            storeId: data.storeId,
+            expectedDelivery: data.expectedDelivery ? new Date(data.expectedDelivery) : null,
+            status: POStatus.APPROVED, // Direct approved workflow for Store POs
+            subtotal,
+            discount: totalDiscount,
+            taxAmount: totalTax,
+            totalAmount: grandTotal,
+            notes: data.notes || null,
+            items: {
+              create: computedItems,
+            },
+          },
+          include: {
+            items: { include: { item: true } },
+            party: true,
+            store: true,
+          },
+        });
+
+        return purchaseOrder;
       },
-      include: {
-        items: { include: { item: true } },
-        party: true,
-        store: true,
-      },
-    });
-
-    return purchaseOrder;
+      { maxWait: 10000, timeout: 20000 }
+    );
   }
 
   static async updatePOStatus(id: string, status: POStatus) {

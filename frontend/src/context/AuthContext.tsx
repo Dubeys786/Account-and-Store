@@ -108,7 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const accessibleWorkspaces: AccessibleWorkspaces = user?.accessibleWorkspaces || {
-    store: userRoles.some((r) => ['STORE_INCHARGE', 'STORE_MANAGER', 'STORE_USER'].includes(r)),
+    store: userRoles.some((r) => ['STORE_INCHARGE', 'STORE_MANAGER', 'STORE_USER', 'ACCOUNT_AND_STORE_INCHARGE'].includes(r)),
     accounts: userRoles.some((r) => ['ACCOUNT_AND_STORE_INCHARGE', 'ACCOUNT_MANAGER', 'ACCOUNT_USER'].includes(r)),
   };
 

@@ -14,8 +14,8 @@ import { preventParameterTampering } from '../../middleware/security.middleware'
 
 const router = Router();
 
-// Store modules are strictly accessible by STORE_INCHARGE, STORE_MANAGER, and STORE_USER.
-router.use(authenticate, preventParameterTampering, requireRoles(['STORE_INCHARGE', 'STORE_MANAGER', 'STORE_USER']));
+// Store modules are strictly accessible by STORE_INCHARGE, STORE_MANAGER, STORE_USER, and ACCOUNT_AND_STORE_INCHARGE.
+router.use(authenticate, preventParameterTampering, requireRoles(['STORE_INCHARGE', 'STORE_MANAGER', 'STORE_USER', 'ACCOUNT_AND_STORE_INCHARGE']));
 
 // Lookup endpoints for forms (scoped to authorized stores)
 router.get('/stores', async (req: Request, res: Response, next: NextFunction) => {
@@ -97,6 +97,8 @@ router.post('/material-inwards', InwardController.createMaterialInward);
 router.get('/stock-register', StockController.getStockRegister);
 router.post('/stock/issue', StockController.issueStock);
 router.post('/stock/return', StockController.returnStock);
+router.get('/stock/open-issues', StockController.getOpenIssues);
+router.get('/stock/return-summary', StockController.getReturnSummary);
 router.get('/stock/transactions', StockController.getTransactions);
 
 // Backward compatible alias
@@ -135,6 +137,16 @@ router.get('/reports/pending-pos', async (_req: Request, res: Response, next: Ne
 router.get('/reports/supplier-rejection', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await StoreReportsService.getSupplierRejectionReport();
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/reports/return-age', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const storeId = (req.query.storeId as string) || req.activeStoreId;
+    const data = await StoreReportsService.getReturnAgeReport(storeId);
     res.json({ success: true, data });
   } catch (err) {
     next(err);

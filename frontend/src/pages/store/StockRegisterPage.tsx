@@ -156,7 +156,7 @@ export const StockRegisterPage: React.FC = () => {
       </div>
 
       {/* Metric Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs flex items-center gap-3.5">
           <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
             <Package className="w-5 h-5" />
@@ -201,62 +201,64 @@ export const StockRegisterPage: React.FC = () => {
       {/* Main Stock Table */}
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
-            <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search Item Code or Name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
-              />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 w-full md:w-auto">
+              <div className="relative w-full sm:w-64">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search Item Code or Name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="w-full sm:w-auto py-1.5 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="ALL">All Categories</option>
+                  {categories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full sm:w-auto py-1.5 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="ALL">All Inventory Status</option>
+                  <option value="NORMAL">Normal Stock</option>
+                  <option value="LOW">Reorder Level Reached</option>
+                  <option value="OUT">Out of Stock</option>
+                </select>
+
+                <select
+                  value={storeFilter}
+                  onChange={(e) => setStoreFilter(e.target.value)}
+                  className="w-full sm:w-auto py-1.5 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Warehouses / Stores</option>
+                  {storesList.map((st) => (
+                    <option key={st.id} value={st.id}>
+                      {st.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="py-1.5 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="ALL">All Categories</option>
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="py-1.5 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="ALL">All Inventory Status</option>
-                <option value="NORMAL">Normal Stock</option>
-                <option value="LOW">Reorder Level Reached</option>
-                <option value="OUT">Out of Stock</option>
-              </select>
-
-              <select
-                value={storeFilter}
-                onChange={(e) => setStoreFilter(e.target.value)}
-                className="py-1.5 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Warehouses / Stores</option>
-                {storesList.map((st) => (
-                  <option key={st.id} value={st.id}>
-                    {st.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <span className="text-xs font-semibold text-slate-500 shrink-0 self-end sm:self-auto">{filteredItems.length} Records</span>
           </div>
-          <span className="text-xs font-semibold text-slate-500">{filteredItems.length} Records</span>
         </CardHeader>
 
         <CardContent className="p-0">
-          <Table>
+          <Table className="min-w-[760px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Item Code</TableHead>

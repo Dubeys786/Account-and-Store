@@ -20,6 +20,7 @@ import { MaterialInwardPage } from './pages/store/MaterialInwardPage';
 import { StockRegisterPage } from './pages/store/StockRegisterPage';
 import { IssueReturnPage } from './pages/store/IssueReturnPage';
 import { StoreReportsPage } from './pages/store/StoreReportsPage';
+import { NotificationsPage } from './pages/notifications/NotificationsPage';
 
 // Accounts Pages
 import { AccountsDashboardPage } from './pages/accounts/AccountsDashboardPage';
@@ -52,14 +53,12 @@ const RootRedirect: React.FC = () => {
     return <Navigate to="/unassigned" replace />;
   }
 
-  if (hasStore && hasAccounts) {
-    return <Navigate to="/workspace" replace />;
-  }
-
-  if (hasAccounts && !hasStore) {
+  // Akhilesh / Accounts incharge defaults to /accounts
+  if (hasAccounts) {
     return <Navigate to="/accounts" replace />;
   }
 
+  // Sakshi / Store incharge defaults to /store
   return <Navigate to="/store" replace />;
 };
 
@@ -84,12 +83,13 @@ export const App: React.FC = () => {
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<RootRedirect />} />
+                <Route path="/notifications" element={<NotificationsPage />} />
 
-                {/* Store & Inventory Domain (STORE_INCHARGE, STORE_MANAGER, STORE_USER) */}
+                {/* Store & Inventory Domain (STORE_INCHARGE, STORE_MANAGER, STORE_USER, ACCOUNT_AND_STORE_INCHARGE) */}
                 <Route
                   element={
                     <ProtectedRoute
-                      allowedRoles={['STORE_INCHARGE', 'STORE_MANAGER', 'STORE_USER']}
+                      allowedRoles={['STORE_INCHARGE', 'STORE_MANAGER', 'STORE_USER', 'ACCOUNT_AND_STORE_INCHARGE']}
                       workspace="store"
                     />
                   }
@@ -98,7 +98,9 @@ export const App: React.FC = () => {
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/store/items" element={<ItemMasterPage />} />
                   <Route path="/store/purchase-orders" element={<POMasterPage />} />
+                  <Route path="/store/material-inward" element={<MaterialInwardPage />} />
                   <Route path="/store/material-inwards" element={<MaterialInwardPage />} />
+                  <Route path="/store/stock" element={<StockRegisterPage />} />
                   <Route path="/store/stock-register" element={<StockRegisterPage />} />
                   <Route path="/store/issue-return" element={<IssueReturnPage />} />
                   <Route path="/store/reports" element={<StoreReportsPage />} />

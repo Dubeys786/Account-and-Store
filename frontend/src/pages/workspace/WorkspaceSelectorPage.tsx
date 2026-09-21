@@ -24,7 +24,7 @@ export const WorkspaceSelectorPage: React.FC = () => {
   const userRolesDisplay = user?.roles?.length ? user.roles.join(', ') : user?.role || 'User';
 
   return (
-    <div className="min-h-screen bg-[#070d1e] text-slate-100 flex flex-col justify-between p-6 sm:p-10 relative select-none">
+    <div className="min-h-screen bg-[#070d1e] text-slate-100 flex flex-col justify-between p-4 sm:p-10 relative select-none">
       {/* Background glow effects */}
       <div className="absolute top-10 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-10 right-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />

@@ -44,6 +44,8 @@ export const MaterialInwardPage: React.FC = () => {
   // View Details Modal state
   const [viewingInward, setViewingInward] = useState<any | null>(null);
 
+  const round2 = (num: number): number => Math.round((num + Number.EPSILON) * 100) / 100;
+
   // Fetch Inwards
   const fetchInwards = async () => {
     setLoading(true);
@@ -54,14 +56,15 @@ export const MaterialInwardPage: React.FC = () => {
     setLoading(false);
   };
 
-  // Fetch Available POs
+  // Fetch Available POs (Only APPROVED or PARTIALLY_RECEIVED with pending items remaining)
   const fetchAvailablePOs = async () => {
     const res = await apiRequest('/store/purchase-orders');
     if (res.success && res.data) {
-      // Filter POs that can be inwarded (APPROVED or PARTIALLY_RECEIVED)
-      const eligible = res.data.filter(
-        (p: any) => p.status === 'APPROVED' || p.status === 'PARTIALLY_RECEIVED'
-      );
+      const eligible = res.data.filter((p: any) => {
+        const isEligibleStatus = p.status === 'APPROVED' || p.status === 'PARTIALLY_RECEIVED';
+        if (!isEligibleStatus) return false;
+        return p.items && p.items.some((pi: any) => (Number(pi.quantity) - Number(pi.receivedQty || 0)) > 0);
+      });
       setAvailablePOs(eligible);
     }
   };
@@ -88,19 +91,19 @@ export const MaterialInwardPage: React.FC = () => {
 
       // Build rows for each PO item with pending quantities
       const rows: InwardItemRow[] = po.items.map((pi: any) => {
-        const remaining = Math.max(0, pi.quantity - pi.receivedQty);
+        const remaining = Math.max(0, round2(Number(pi.quantity) - Number(pi.receivedQty || 0)));
         return {
           itemId: pi.itemId,
           itemCode: pi.item?.code || '',
           itemName: pi.item?.name || '',
           unit: pi.item?.unit || 'PCS',
-          orderedQty: pi.quantity,
-          previouslyReceivedQty: pi.receivedQty,
+          orderedQty: Number(pi.quantity),
+          previouslyReceivedQty: Number(pi.receivedQty || 0),
           remainingAllowed: remaining,
           receivedQty: remaining,
           rejectedQty: 0,
           acceptedQty: remaining,
-          rate: pi.rate,
+          rate: Number(pi.rate),
           remarks: 'QC Passed - Inward to Store',
         };
       });
@@ -125,12 +128,10 @@ export const MaterialInwardPage: React.FC = () => {
 
       if (field === 'receivedQty') {
         row.receivedQty = numVal;
-        // Auto adjust accepted
-        row.acceptedQty = Math.max(0, numVal - row.rejectedQty);
+        row.acceptedQty = Math.max(0, round2(numVal - row.rejectedQty));
       } else if (field === 'rejectedQty') {
         row.rejectedQty = numVal;
-        // Auto adjust accepted
-        row.acceptedQty = Math.max(0, row.receivedQty - numVal);
+        row.acceptedQty = Math.max(0, round2(row.receivedQty - numVal));
       } else if (field === 'acceptedQty') {
         row.acceptedQty = numVal;
       }
@@ -149,6 +150,7 @@ export const MaterialInwardPage: React.FC = () => {
     setRemarks('');
     setInwardItems([]);
     setCreateError('');
+    fetchAvailablePOs(); // Guarantee latest DB POs are fetched when opening modal
     setIsCreateOpen(true);
   };
 
@@ -274,17 +276,19 @@ export const MaterialInwardPage: React.FC = () => {
       {/* Main List Table */}
       <Card>
         <CardHeader>
-          <div className="relative w-full sm:w-80">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search by Inward #, PO #, Challan..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
-            />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+            <div className="relative w-full sm:w-80">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search by Inward #, PO #, Challan..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+              />
+            </div>
+            <span className="text-xs font-semibold text-slate-500 self-end sm:self-auto">{filteredInwards.length} Inward Records</span>
           </div>
-          <span className="text-xs font-semibold text-slate-500">{filteredInwards.length} Inward Records</span>
         </CardHeader>
 
         <CardContent className="p-0">
@@ -362,7 +366,7 @@ export const MaterialInwardPage: React.FC = () => {
         title="New Material Inward (Goods Receipt Note)"
         size="4xl"
         footer={
-          <div className="flex items-center justify-between w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
             <div className="text-xs text-slate-500">
               {inwardItems.length > 0 && (
                 <span>
@@ -371,7 +375,7 @@ export const MaterialInwardPage: React.FC = () => {
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
               <Button variant="outline" size="sm" onClick={() => setIsCreateOpen(false)}>
                 Cancel
               </Button>
@@ -502,16 +506,17 @@ export const MaterialInwardPage: React.FC = () => {
                 </div>
 
                 <div className="overflow-x-auto border border-slate-200 rounded-lg">
-                  <table className="w-full text-xs text-left">
+                  <table className="w-full text-xs text-left min-w-[700px]">
                     <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                       <tr>
                         <th className="p-2.5">Item</th>
                         <th className="p-2.5 text-right">Ordered</th>
-                        <th className="p-2.5 text-right">Remaining Allowed</th>
-                        <th className="p-2.5 text-right w-24">Received Qty</th>
-                        <th className="p-2.5 text-right w-24">Rejected Qty</th>
+                        <th className="p-2.5 text-right">Previously Received</th>
+                        <th className="p-2.5 text-right">Pending Qty</th>
+                        <th className="p-2.5 text-right w-24">Receiving Qty</th>
+                        <th className="p-2.5 text-right w-20">Rejected Qty</th>
                         <th className="p-2.5 text-right w-24 bg-emerald-50/50 text-emerald-800">Accepted Qty</th>
-                        <th className="p-2.5 w-44">QC Remarks</th>
+                        <th className="p-2.5 w-40">QC Remarks</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -524,6 +529,7 @@ export const MaterialInwardPage: React.FC = () => {
                               <div className="text-[10px] text-slate-400 font-mono">{item.itemCode}</div>
                             </td>
                             <td className="p-2.5 text-right font-mono">{item.orderedQty} {item.unit}</td>
+                            <td className="p-2.5 text-right font-mono text-slate-600">{item.previouslyReceivedQty} {item.unit}</td>
                             <td className="p-2.5 text-right font-mono font-semibold text-blue-600">
                               {item.remainingAllowed} {item.unit}
                             </td>
@@ -632,7 +638,7 @@ export const MaterialInwardPage: React.FC = () => {
                 Inward Items &amp; QC Breakdown
               </h4>
               <div className="overflow-x-auto border border-slate-200 rounded-lg">
-                <table className="w-full text-xs text-left">
+                <table className="w-full text-xs text-left min-w-[500px]">
                   <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                     <tr>
                       <th className="p-2.5">Item Code</th>

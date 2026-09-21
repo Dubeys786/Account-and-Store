@@ -3,6 +3,7 @@ import { InwardService } from './inward.service';
 import { UserRole } from '@prisma/client';
 import prisma from '../../../config/db';
 import { AuditService } from '../../audit/audit.service';
+import { NotificationService } from '../../notification/notification.service';
 
 export class InwardController {
   static async getMaterialInwards(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -120,6 +121,15 @@ export class InwardController {
         newValues: { inwardNumber: inward.inwardNumber, poId, storeId: po.storeId },
         ipAddress: req.ip || req.socket.remoteAddress,
         userAgent: req.headers['user-agent'],
+      });
+
+      // Notify store users
+      await NotificationService.notifyStoreUsers(po.storeId, {
+        title: 'Material Inward Completed',
+        message: `Material Inward ${inward.inwardNumber} has been completed and stock has been updated.`,
+        type: 'STORE',
+        referenceType: 'material_inward',
+        referenceId: inward.id,
       });
 
       res.status(201).json({

@@ -47,7 +47,7 @@ export const LoginPage: React.FC = () => {
 
       <div className="w-full max-w-md relative z-10">
         {/* Card */}
-        <div className="bg-[#0e172e] border border-slate-800 rounded-2xl shadow-2xl p-8 backdrop-blur-md">
+        <div className="bg-[#0e172e] border border-slate-800 rounded-2xl shadow-2xl p-5 sm:p-8 backdrop-blur-md">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-500/30 mb-3 text-blue-400">

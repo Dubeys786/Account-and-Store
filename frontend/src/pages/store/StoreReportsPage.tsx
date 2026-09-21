@@ -1,17 +1,38 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, Download, TrendingUp, Clock, AlertOctagon, DollarSign, Package, Layers, RefreshCw } from 'lucide-react';
+import {
+  BarChart3,
+  Download,
+  TrendingUp,
+  Clock,
+  AlertOctagon,
+  DollarSign,
+  Package,
+  Layers,
+  RefreshCw,
+  RotateCcw,
+  CheckCircle2,
+  AlertTriangle,
+  Search,
+  Filter,
+} from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/common/Card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/common/Table';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import apiRequest from '../../services/api';
+import { isDamagedCondition } from '../../config/returnRules';
 
-type ReportTab = 'valuation' | 'consumption' | 'pending-pos' | 'supplier-rejection';
+type ReportTab = 'valuation' | 'consumption' | 'pending-pos' | 'supplier-rejection' | 'return-age';
 
 export const StoreReportsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ReportTab>('valuation');
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState<any>(null);
+
+  // Return Age Report Filters
+  const [returnSearch, setReturnSearch] = useState('');
+  const [returnClassificationFilter, setReturnClassificationFilter] = useState('ALL');
+  const [returnConditionFilter, setReturnConditionFilter] = useState('ALL');
 
   // Fetch report based on active tab
   const fetchReport = async (tab: ReportTab) => {
@@ -36,51 +57,86 @@ export const StoreReportsPage: React.FC = () => {
     let rows: any[][] = [];
     let filename = `Store_Report_${activeTab}_${new Date().toISOString().split('T')[0]}.csv`;
 
-    if (activeTab === 'valuation' && reportData.items) {
-      headers = ['Item Code', 'Item Name', 'Category', 'Unit', 'Current Stock', 'Unit Valuation Rate (₹)', 'Total Valuation (₹)'];
-      rows = reportData.items.map((i: any) => [
+    if (activeTab === 'valuation') {
+      const items = reportData.details || reportData.items || [];
+      headers = ['Item Code', 'Item Name', 'Category', 'Unit', 'Current Stock', 'Valuation Rate (₹)', 'Total Valuation (₹)'];
+      rows = items.map((i: any) => [
         i.code,
         `"${i.name}"`,
         i.category,
         i.unit,
         i.currentStock,
-        i.valuationRate,
+        i.estimatedRate || i.valuationRate,
         i.totalValuation,
       ]);
-    } else if (activeTab === 'consumption' && reportData.consumption) {
-      headers = ['Item Code', 'Item Name', 'Category', 'Unit', 'Total Consumed Qty', 'Issue Count', 'Departments'];
-      rows = reportData.consumption.map((i: any) => [
-        i.code,
-        `"${i.name}"`,
+    } else if (activeTab === 'consumption') {
+      const consumption = Array.isArray(reportData) ? reportData : reportData.consumption || [];
+      headers = ['Item Code', 'Item Name', 'Category', 'Unit', 'Total Issued', 'Issue Transactions Count'];
+      rows = consumption.map((i: any) => [
+        i.itemCode || i.code,
+        `"${i.itemName || i.name}"`,
         i.category,
         i.unit,
-        i.totalConsumedQty,
-        i.issueCount,
-        `"${i.departments.join('; ')}"`,
+        i.totalIssued || i.totalConsumedQty,
+        i.issueTransactionsCount || i.issueCount,
       ]);
-    } else if (activeTab === 'pending-pos' && reportData.pendingPOs) {
-      headers = ['PO Number', 'PO Date', 'Supplier', 'Status', 'Days Pending', 'Ordered Qty', 'Received Qty', 'Pending Qty', 'Pending Value (₹)'];
-      rows = reportData.pendingPOs.map((p: any) => [
+    } else if (activeTab === 'pending-pos') {
+      const pendingPOs = Array.isArray(reportData) ? reportData : reportData.pendingPOs || [];
+      headers = ['PO Number', 'PO Date', 'Supplier', 'Status', 'Grand Total (₹)'];
+      rows = pendingPOs.map((p: any) => [
         p.poNumber,
         new Date(p.poDate).toLocaleDateString(),
-        `"${p.supplier?.name || ''}"`,
+        `"${p.party?.name || p.supplier?.name || ''}"`,
         p.status,
-        p.daysPending,
-        p.orderedQty,
-        p.receivedQty,
-        p.pendingQty,
-        p.estimatedPendingValue,
+        p.grandTotal || p.estimatedPendingValue || 0,
       ]);
-    } else if (activeTab === 'supplier-rejection' && reportData.suppliers) {
-      headers = ['Supplier Code', 'Supplier Name', 'Total Inwards', 'Total Received Qty', 'Total Rejected Qty', 'Total Accepted Qty', 'Rejection Rate %'];
-      rows = reportData.suppliers.map((s: any) => [
-        s.partyCode,
-        `"${s.partyName}"`,
-        s.totalInwards,
+    } else if (activeTab === 'supplier-rejection') {
+      const suppliers = Array.isArray(reportData) ? reportData : reportData.suppliers || [];
+      headers = ['Supplier Code', 'Supplier Name', 'Total Received Qty', 'Total Rejected Qty', 'Total Accepted Qty', 'Rejection Rate %'];
+      rows = suppliers.map((s: any) => [
+        s.supplierCode || s.partyCode,
+        `"${s.supplierName || s.partyName}"`,
         s.totalReceived,
         s.totalRejected,
         s.totalAccepted,
         s.rejectionRatePercent,
+      ]);
+    } else if (activeTab === 'return-age' && reportData.records) {
+      headers = [
+        'Return Date',
+        'Original Issue Date',
+        'Item Code',
+        'Item Name',
+        'Category',
+        'Store Code',
+        'Store Name',
+        'Issued Qty',
+        'Returned Qty',
+        'Unit',
+        'Days Held',
+        'Return Age Classification',
+        'Condition',
+        'Issued To / Department',
+        'Return Reason',
+        'Notes',
+      ];
+      rows = reportData.records.map((r: any) => [
+        r.returnDate ? new Date(r.returnDate).toLocaleDateString() : '',
+        r.issueDate ? new Date(r.issueDate).toLocaleDateString() : '',
+        r.itemCode,
+        `"${r.itemName}"`,
+        r.category || '',
+        r.storeCode || '',
+        `"${r.storeName}"`,
+        r.issuedQuantity ?? '',
+        r.returnedQuantity,
+        r.unit,
+        r.daysHeld,
+        `"${r.classificationLabel}"`,
+        `"${r.condition}"`,
+        `"${r.issuedTo}"`,
+        `"${r.returnReason || ''}"`,
+        `"${r.notes || ''}"`,
       ]);
     }
 
@@ -96,6 +152,29 @@ export const StoreReportsPage: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  // Filtered return age records
+  const filteredReturnRecords = (reportData?.records || []).filter((r: any) => {
+    const term = returnSearch.toLowerCase();
+    const matchesSearch =
+      !term ||
+      r.itemCode?.toLowerCase().includes(term) ||
+      r.itemName?.toLowerCase().includes(term) ||
+      r.issuedTo?.toLowerCase().includes(term) ||
+      r.notes?.toLowerCase().includes(term);
+
+    if (!matchesSearch) return false;
+
+    if (returnClassificationFilter !== 'ALL' && r.classificationKey !== returnClassificationFilter) {
+      return false;
+    }
+
+    if (returnConditionFilter !== 'ALL' && r.condition !== returnConditionFilter) {
+      return false;
+    }
+
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -108,11 +187,16 @@ export const StoreReportsPage: React.FC = () => {
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Store &amp; Inventory Reports</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Real-time automated valuation, consumption analytics, pending delivery tracking, and supplier QC audits
+            Real-time automated valuation, consumption analytics, return age tracking, and supplier QC audits
           </p>
         </div>
         <div className="flex items-center gap-2.5">
-          <Button size="sm" variant="outline" icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />} onClick={() => fetchReport(activeTab)}>
+          <Button
+            size="sm"
+            variant="outline"
+            icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />}
+            onClick={() => fetchReport(activeTab)}
+          >
             Refresh
           </Button>
           <Button size="sm" variant="primary" icon={<Download className="w-3.5 h-3.5" />} onClick={handleExportCSV}>
@@ -122,7 +206,7 @@ export const StoreReportsPage: React.FC = () => {
       </div>
 
       {/* Report Navigation Tabs */}
-      <div className="flex overflow-x-auto border-b border-slate-200 space-x-2">
+      <div className="flex overflow-x-auto border-b border-slate-200 space-x-2 pb-1 -mx-2 px-2 sm:mx-0 sm:px-0">
         <button
           onClick={() => setActiveTab('valuation')}
           className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
@@ -170,6 +254,18 @@ export const StoreReportsPage: React.FC = () => {
           <AlertOctagon className="w-4 h-4" />
           Supplier QC Rejection Rate
         </button>
+
+        <button
+          onClick={() => setActiveTab('return-age')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'return-age'
+              ? 'border-blue-600 text-blue-600 bg-blue-50/40'
+              : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
+          }`}
+        >
+          <RotateCcw className="w-4 h-4" />
+          Return Age Analysis
+        </button>
       </div>
 
       {/* Loading state */}
@@ -183,14 +279,16 @@ export const StoreReportsPage: React.FC = () => {
       {/* TAB 1: STOCK VALUATION SUMMARY */}
       {!loading && activeTab === 'valuation' && reportData && (
         <div className="space-y-5">
-          {/* Top KPI row */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
                 Total Physical Inventory Value
               </span>
               <span className="text-2xl font-bold font-mono text-blue-600 block mt-1">
-                ₹ {Number(reportData.totalValuation || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₹ {Number(reportData.summary?.totalStockValuation || reportData.totalValuation || 0).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </span>
             </div>
 
@@ -199,51 +297,20 @@ export const StoreReportsPage: React.FC = () => {
                 Active Catalog SKUs
               </span>
               <span className="text-2xl font-bold font-mono text-slate-900 block mt-1">
-                {reportData.items?.length || 0} Items
-              </span>
-            </div>
-
-            <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-                Tracked Categories
-              </span>
-              <span className="text-2xl font-bold font-mono text-slate-900 block mt-1">
-                {Object.keys(reportData.categoryBreakdown || {}).length} Categories
+                {reportData.summary?.totalItems || reportData.details?.length || reportData.items?.length || 0} Items
               </span>
             </div>
           </div>
 
-          {/* Category breakdown pills */}
-          {reportData.categoryBreakdown && (
-            <Card>
-              <CardHeader>
-                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Valuation by Category
-                </span>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {Object.entries(reportData.categoryBreakdown).map(([cat, val]: [string, any]) => (
-                    <div key={cat} className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                      <span className="text-[10px] text-slate-500 font-semibold uppercase">{cat}</span>
-                      <span className="text-sm font-bold font-mono text-slate-900 block mt-0.5">
-                        ₹ {Number(val).toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Detailed table */}
           <Card>
             <CardHeader>
               <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Item Valuation Details</span>
-              <span className="text-xs text-slate-500">{reportData.items?.length || 0} items</span>
+              <span className="text-xs text-slate-500">
+                {(reportData.details || reportData.items || []).length} items
+              </span>
             </CardHeader>
             <CardContent className="p-0">
-              <Table>
+              <Table className="min-w-[650px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Item Code</TableHead>
@@ -255,13 +322,17 @@ export const StoreReportsPage: React.FC = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {reportData.items?.map((item: any) => (
-                    <TableRow key={item.itemId}>
+                  {(reportData.details || reportData.items || []).map((item: any) => (
+                    <TableRow key={item.id || item.itemId}>
                       <TableCell className="font-mono text-xs font-bold text-blue-600">{item.code}</TableCell>
                       <TableCell className="font-medium text-slate-800">{item.name}</TableCell>
-                      <TableCell><Badge variant="neutral">{item.category}</Badge></TableCell>
-                      <TableCell className="text-right font-mono font-semibold">{item.currentStock} {item.unit}</TableCell>
-                      <TableCell className="text-right font-mono">₹ {item.valuationRate}</TableCell>
+                      <TableCell>
+                        <Badge variant="neutral">{item.category}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-mono font-semibold">
+                        {item.currentStock} {item.unit}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">₹ {item.estimatedRate || item.valuationRate}</TableCell>
                       <TableCell className="text-right font-mono font-bold text-slate-900">
                         ₹ {Number(item.totalValuation).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </TableCell>
@@ -282,10 +353,12 @@ export const StoreReportsPage: React.FC = () => {
               <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                 Material Consumption &amp; Departmental Utilization
               </span>
-              <span className="text-xs text-slate-500">{reportData.consumption?.length || 0} items analyzed</span>
+              <span className="text-xs text-slate-500">
+                {(Array.isArray(reportData) ? reportData : reportData.consumption || []).length} items analyzed
+              </span>
             </CardHeader>
             <CardContent className="p-0">
-              <Table>
+              <Table className="min-w-[600px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Item Code</TableHead>
@@ -293,31 +366,21 @@ export const StoreReportsPage: React.FC = () => {
                     <TableHead>Category</TableHead>
                     <TableHead className="text-right">Total Issued / Consumed</TableHead>
                     <TableHead className="text-right">Issue Frequency</TableHead>
-                    <TableHead>Consuming Departments</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {reportData.consumption?.map((item: any) => (
-                    <TableRow key={item.itemId}>
-                      <TableCell className="font-mono text-xs font-bold text-blue-600">{item.code}</TableCell>
-                      <TableCell className="font-medium text-slate-800">{item.name}</TableCell>
-                      <TableCell><Badge variant="neutral">{item.category}</Badge></TableCell>
-                      <TableCell className="text-right font-mono font-bold text-rose-600">
-                        {item.totalConsumedQty} {item.unit}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">{item.issueCount} times</TableCell>
+                  {(Array.isArray(reportData) ? reportData : reportData.consumption || []).map((item: any, idx: number) => (
+                    <TableRow key={item.itemCode || idx}>
+                      <TableCell className="font-mono text-xs font-bold text-blue-600">{item.itemCode || item.code}</TableCell>
+                      <TableCell className="font-medium text-slate-800">{item.itemName || item.name}</TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {item.departments && item.departments.length > 0 ? (
-                            item.departments.map((dept: string, i: number) => (
-                              <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-700 text-[10px] rounded font-medium">
-                                {dept}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-slate-400 text-xs">—</span>
-                          )}
-                        </div>
+                        <Badge variant="neutral">{item.category}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-mono font-bold text-rose-600">
+                        {item.totalIssued || item.totalConsumedQty} {item.unit}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {item.issueTransactionsCount || item.issueCount || 1} times
                       </TableCell>
                     </TableRow>
                   ))}
@@ -331,26 +394,6 @@ export const StoreReportsPage: React.FC = () => {
       {/* TAB 3: PENDING PO AGING REPORT */}
       {!loading && activeTab === 'pending-pos' && reportData && (
         <div className="space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-                Total Pending POs
-              </span>
-              <span className="text-2xl font-bold font-mono text-amber-600 block mt-1">
-                {reportData.totalPendingPOs || 0} Orders
-              </span>
-            </div>
-
-            <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-                Estimated Pending Delivery Value
-              </span>
-              <span className="text-2xl font-bold font-mono text-blue-600 block mt-1">
-                ₹ {Number(reportData.totalPendingValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-          </div>
-
           <Card>
             <CardHeader>
               <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
@@ -358,47 +401,35 @@ export const StoreReportsPage: React.FC = () => {
               </span>
             </CardHeader>
             <CardContent className="p-0">
-              <Table>
+              <Table className="min-w-[600px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>PO Number</TableHead>
                     <TableHead>PO Date</TableHead>
                     <TableHead>Supplier / Vendor</TableHead>
-                    <TableHead>Aging (Days)</TableHead>
-                    <TableHead className="text-right">Ordered Qty</TableHead>
-                    <TableHead className="text-right">Received Qty</TableHead>
-                    <TableHead className="text-right font-bold text-amber-600">Pending Qty</TableHead>
-                    <TableHead className="text-right font-bold">Pending Value (₹)</TableHead>
+                    <TableHead className="text-right">Grand Total (₹)</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {reportData.pendingPOs?.length === 0 ? (
+                  {(Array.isArray(reportData) ? reportData : reportData.pendingPOs || []).length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-12 text-slate-400">
+                      <TableCell colSpan={5} className="text-center py-12 text-slate-400">
                         No pending purchase orders! All orders are fully received or closed.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    reportData.pendingPOs?.map((po: any) => (
-                      <TableRow key={po.poId}>
+                    (Array.isArray(reportData) ? reportData : reportData.pendingPOs || []).map((po: any) => (
+                      <TableRow key={po.id || po.poId}>
                         <TableCell className="font-mono text-xs font-bold text-blue-600">{po.poNumber}</TableCell>
                         <TableCell>{new Date(po.poDate).toLocaleDateString()}</TableCell>
-                        <TableCell className="font-medium text-slate-800">{po.supplier?.name}</TableCell>
-                        <TableCell>
-                          <span className={`px-2 py-0.5 text-xs font-mono font-semibold rounded ${
-                            po.daysPending > 30 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'
-                          }`}>
-                            {po.daysPending} days
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right font-mono">{po.orderedQty}</TableCell>
-                        <TableCell className="text-right font-mono text-emerald-600">{po.receivedQty}</TableCell>
-                        <TableCell className="text-right font-mono font-bold text-amber-600">{po.pendingQty}</TableCell>
+                        <TableCell className="font-medium text-slate-800">{po.party?.name || po.supplier?.name}</TableCell>
                         <TableCell className="text-right font-mono font-bold text-slate-900">
-                          ₹ {Number(po.estimatedPendingValue).toLocaleString()}
+                          ₹ {Number(po.grandTotal || 0).toLocaleString()}
                         </TableCell>
-                        <TableCell><Badge variant="warning">{po.status}</Badge></TableCell>
+                        <TableCell>
+                          <Badge variant="warning">{po.status}</Badge>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -419,12 +450,11 @@ export const StoreReportsPage: React.FC = () => {
               </span>
             </CardHeader>
             <CardContent className="p-0">
-              <Table>
+              <Table className="min-w-[650px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Supplier Code</TableHead>
                     <TableHead>Supplier Name</TableHead>
-                    <TableHead className="text-right">Total Deliveries (Inwards)</TableHead>
                     <TableHead className="text-right">Total Received Qty</TableHead>
                     <TableHead className="text-right text-red-600 font-bold">Rejected Qty</TableHead>
                     <TableHead className="text-right text-emerald-600 font-bold">Accepted Qty</TableHead>
@@ -433,25 +463,26 @@ export const StoreReportsPage: React.FC = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {reportData.suppliers?.length === 0 ? (
+                  {(Array.isArray(reportData) ? reportData : reportData.suppliers || []).length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-12 text-slate-400">
+                      <TableCell colSpan={7} className="text-center py-12 text-slate-400">
                         No inward quality records found for suppliers.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    reportData.suppliers?.map((sup: any) => {
-                      const rate = sup.rejectionRatePercent;
+                    (Array.isArray(reportData) ? reportData : reportData.suppliers || []).map((sup: any, idx: number) => {
+                      const rate = sup.rejectionRatePercent || 0;
                       return (
-                        <TableRow key={sup.partyId}>
-                          <TableCell className="font-mono text-xs font-semibold text-blue-600">{sup.partyCode}</TableCell>
-                          <TableCell className="font-medium text-slate-800">{sup.partyName}</TableCell>
-                          <TableCell className="text-right font-mono">{sup.totalInwards} GRNs</TableCell>
+                        <TableRow key={sup.supplierCode || idx}>
+                          <TableCell className="font-mono text-xs font-semibold text-blue-600">
+                            {sup.supplierCode || sup.partyCode}
+                          </TableCell>
+                          <TableCell className="font-medium text-slate-800">{sup.supplierName || sup.partyName}</TableCell>
                           <TableCell className="text-right font-mono">{sup.totalReceived}</TableCell>
                           <TableCell className="text-right font-mono font-bold text-red-600">{sup.totalRejected}</TableCell>
                           <TableCell className="text-right font-mono font-bold text-emerald-600">{sup.totalAccepted}</TableCell>
                           <TableCell className="text-right font-mono font-bold text-slate-900">
-                            {rate.toFixed(1)}%
+                            {Number(rate).toFixed(1)}%
                           </TableCell>
                           <TableCell>
                             {rate === 0 ? (
@@ -461,6 +492,215 @@ export const StoreReportsPage: React.FC = () => {
                             ) : (
                               <Badge variant="danger">High Rejection (&gt; 5%)</Badge>
                             )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* TAB 5: RETURN AGE ANALYSIS REPORT */}
+      {!loading && activeTab === 'return-age' && reportData && (
+        <div className="space-y-5">
+          {/* Summary KPIs */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
+            <div className="p-3 sm:p-3.5 bg-white border border-slate-200 rounded-xl shadow-xs">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 mb-1">
+                <span>TOTAL RETURNS</span>
+                <RotateCcw className="w-3.5 h-3.5 text-blue-600" />
+              </div>
+              <div className="text-xl font-bold font-mono text-slate-900">
+                {reportData.summary?.totalReturns || 0}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                {reportData.summary?.totalReturnedQty || 0} Units Returned
+              </div>
+            </div>
+
+            <div className="p-3 sm:p-3.5 bg-emerald-50/50 border border-emerald-200 rounded-xl shadow-xs">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-800 mb-1">
+                <span>RECENT (0–7d)</span>
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              </div>
+              <div className="text-xl font-bold font-mono text-emerald-700">
+                {reportData.summary?.recentCount || 0}
+              </div>
+              <div className="text-[10px] text-emerald-600/80 mt-0.5">
+                Returned within 1 week
+              </div>
+            </div>
+
+            <div className="p-3 sm:p-3.5 bg-amber-50/50 border border-amber-200 rounded-xl shadow-xs">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-amber-800 mb-1">
+                <span>OLD (8–30d)</span>
+                <Clock className="w-3.5 h-3.5 text-amber-600" />
+              </div>
+              <div className="text-xl font-bold font-mono text-amber-700">
+                {reportData.summary?.oldCount || 0}
+              </div>
+              <div className="text-[10px] text-amber-600/80 mt-0.5">
+                Returned within 1 month
+              </div>
+            </div>
+
+            <div className="p-3 sm:p-3.5 bg-rose-50/50 border border-rose-200 rounded-xl shadow-xs">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-rose-800 mb-1">
+                <span>VERY OLD (31+d)</span>
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+              </div>
+              <div className="text-xl font-bold font-mono text-rose-700">
+                {reportData.summary?.veryOldCount || 0}
+              </div>
+              <div className="text-[10px] text-rose-600/80 mt-0.5">
+                Held longer than 30 days
+              </div>
+            </div>
+
+            <div className="p-3 sm:p-3.5 bg-blue-50/50 border border-blue-200 rounded-xl shadow-xs col-span-2 sm:col-span-1">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-blue-800 mb-1">
+                <span>AVG RETURN AGE</span>
+                <Clock className="w-3.5 h-3.5 text-blue-600" />
+              </div>
+              <div className="text-xl font-bold font-mono text-blue-700">
+                {reportData.summary?.avgDaysHeld || 0} <span className="text-xs font-normal">days</span>
+              </div>
+              <div className="text-[10px] text-blue-600/80 mt-0.5">
+                Average days held in field
+              </div>
+            </div>
+          </div>
+
+          {/* Table with search and filters */}
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 w-full">
+                <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
+                  <div className="relative w-full sm:w-60">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search Item, Dept, Notes..."
+                      value={returnSearch}
+                      onChange={(e) => setReturnSearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
+                      <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <select
+                        value={returnClassificationFilter}
+                        onChange={(e) => setReturnClassificationFilter(e.target.value)}
+                        className="w-full sm:w-auto py-1.5 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="ALL">All Return Ages</option>
+                        <option value="RECENT_RETURN">Recent Return (0–7d)</option>
+                        <option value="OLD_RETURN">Old Return (8–30d)</option>
+                        <option value="VERY_OLD_RETURN">Very Old Return (31+d)</option>
+                      </select>
+                    </div>
+
+                    <select
+                      value={returnConditionFilter}
+                      onChange={(e) => setReturnConditionFilter(e.target.value)}
+                      className="w-full sm:w-auto py-1.5 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="ALL">All Conditions</option>
+                      <option value="Good">Good (Usable)</option>
+                      <option value="Damaged">Damaged (Quarantined)</option>
+                      <option value="Partially Damaged">Partially Damaged</option>
+                      <option value="Defective">Defective</option>
+                    </select>
+                  </div>
+                </div>
+
+                <span className="text-xs font-semibold text-slate-500 shrink-0 self-end lg:self-auto">
+                  {filteredReturnRecords.length} Return Records
+                </span>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              <Table className="min-w-[900px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Return Date</TableHead>
+                    <TableHead>Issue Date</TableHead>
+                    <TableHead>Item Code / Name</TableHead>
+                    <TableHead>Store</TableHead>
+                    <TableHead className="text-right">Issued Qty</TableHead>
+                    <TableHead className="text-right">Returned Qty</TableHead>
+                    <TableHead>Days Held</TableHead>
+                    <TableHead>Classification</TableHead>
+                    <TableHead>Condition</TableHead>
+                    <TableHead>Department / Issued To</TableHead>
+                    <TableHead>Reason / Notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredReturnRecords.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={11} className="text-center py-12 text-slate-400">
+                        No material returns recorded matching selected criteria.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredReturnRecords.map((r: any) => {
+                      const isDamaged = isDamagedCondition(r.condition);
+                      return (
+                        <TableRow key={r.id}>
+                          <TableCell className="font-mono text-xs text-slate-700">
+                            {r.returnDate ? new Date(r.returnDate).toLocaleDateString() : '—'}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-slate-500">
+                            {r.issueDate ? new Date(r.issueDate).toLocaleDateString() : '—'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-mono text-xs font-bold text-slate-900">{r.itemCode}</div>
+                            <div className="text-xs text-slate-600 truncate max-w-[160px]">{r.itemName}</div>
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-600">{r.storeName}</TableCell>
+                          <TableCell className="text-right font-mono text-xs text-slate-500">
+                            {r.issuedQuantity !== null ? `${r.issuedQuantity} ${r.unit}` : '—'}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs font-bold text-emerald-600">
+                            +{r.returnedQuantity} {r.unit}
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-mono text-xs font-semibold text-slate-900">
+                              {r.daysHeld} days
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                r.classificationKey === 'RECENT_RETURN'
+                                  ? 'success'
+                                  : r.classificationKey === 'OLD_RETURN'
+                                  ? 'warning'
+                                  : 'danger'
+                              }
+                              size="sm"
+                            >
+                              {r.classificationLabel}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={isDamaged ? 'danger' : 'success'} size="sm">
+                              {r.condition}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-700 max-w-[140px] truncate">
+                            {r.issuedTo}
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-500 max-w-[160px] truncate">
+                            {r.returnReason ? `${r.returnReason}${r.notes ? ` - ${r.notes}` : ''}` : r.notes || '—'}
                           </TableCell>
                         </TableRow>
                       );

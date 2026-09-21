@@ -181,10 +181,10 @@ export const ItemMasterPage: React.FC = () => {
 
       {/* Filter and Control Bar */}
       <Card>
-        <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3 flex-1">
+        <div className="p-3 sm:p-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5 sm:gap-3 flex-1 w-full">
             {/* Search */}
-            <div className="relative w-72">
+            <div className="relative w-full sm:w-72">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
@@ -194,7 +194,7 @@ export const ItemMasterPage: React.FC = () => {
                   setPage(1);
                 }}
                 placeholder="Search by code, name, or brand..."
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                className="w-full pl-9 pr-3 py-2 sm:py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
               />
             </div>
 
@@ -205,7 +205,7 @@ export const ItemMasterPage: React.FC = () => {
                 setCategoryFilter(e.target.value);
                 setPage(1);
               }}
-              className="text-xs py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none"
+              className="text-xs py-2 sm:py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none w-full sm:w-auto"
             >
               <option value="ALL">All Categories</option>
               <option value="RAW_MATERIALS">Raw Materials</option>
@@ -221,7 +221,7 @@ export const ItemMasterPage: React.FC = () => {
                 setStatusFilter(e.target.value);
                 setPage(1);
               }}
-              className="text-xs py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none"
+              className="text-xs py-2 sm:py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none w-full sm:w-auto"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active Only</option>
@@ -230,12 +230,12 @@ export const ItemMasterPage: React.FC = () => {
           </div>
 
           {/* Sort Control */}
-          <div className="flex items-center gap-2 text-xs text-slate-600">
+          <div className="flex items-center justify-between sm:justify-start gap-2 text-xs text-slate-600 w-full sm:w-auto">
             <span>Sort by:</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="py-1 px-2.5 bg-slate-50 border border-slate-200 rounded-lg font-medium"
+              className="py-1 px-2.5 bg-slate-50 border border-slate-200 rounded-lg font-medium text-xs"
             >
               <option value="name">Name</option>
               <option value="code">Code</option>
@@ -405,7 +405,7 @@ export const ItemMasterPage: React.FC = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Item Code *"
               value={formData.code}
@@ -420,7 +420,7 @@ export const ItemMasterPage: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Input
               label="Brand"
               value={formData.brand}
@@ -452,7 +452,7 @@ export const ItemMasterPage: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Input
               label="Min Stock"
               type="number"
@@ -524,7 +524,7 @@ export const ItemMasterPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="p-3 bg-white border border-slate-200 rounded-lg">
                 <span className="text-slate-400 font-medium">Category:</span>
                 <span className="font-semibold text-slate-800 ml-1.5">{selectedItem.category}</span>

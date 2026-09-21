@@ -22,9 +22,28 @@ export interface CreateInwardInput {
 export class InwardService {
   static async generateInwardNumber(): Promise<string> {
     const year = new Date().getFullYear();
-    const count = await prisma.materialInward.count();
-    const seq = (count + 1).toString().padStart(4, '0');
-    return `INW-${year}-${seq}`;
+    const prefix = `INW-${year}-`;
+    const lastInward = await prisma.materialInward.findFirst({
+      where: {
+        inwardNumber: {
+          startsWith: prefix,
+        },
+      },
+      orderBy: {
+        inwardNumber: 'desc',
+      },
+    });
+
+    let nextSeq = 1;
+    if (lastInward && lastInward.inwardNumber) {
+      const parts = lastInward.inwardNumber.split('-');
+      const lastSeq = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(lastSeq)) {
+        nextSeq = lastSeq + 1;
+      }
+    }
+    const seqStr = nextSeq.toString().padStart(4, '0');
+    return `${prefix}${seqStr}`;
   }
 
   static async getMaterialInwards(filters: { storeId?: string; storeIds?: string[]; poId?: string; search?: string } = {}) {
@@ -87,54 +106,54 @@ export class InwardService {
       throw new Error('Material Inward must contain at least one line item.');
     }
 
-    // 1. Fetch and validate Purchase Order
-    const po = await prisma.purchaseOrder.findUnique({
-      where: { id: data.poId },
-      include: {
-        items: true,
-      },
-    });
-
-    if (!po) {
-      throw new Error('Invalid Purchase Order referenced.');
-    }
-
-    if (po.status === POStatus.CANCELLED) {
-      throw new Error('Cannot create Material Inward against a CANCELLED Purchase Order.');
-    }
-
-    if (po.status === POStatus.RECEIVED) {
-      throw new Error('Purchase Order has already been fully received.');
-    }
-
-    // 2. Validate items and verify against over-receiving
-    for (const inItem of data.items) {
-      const poItem = po.items.find((p) => p.itemId === inItem.itemId);
-      if (!poItem) {
-        throw new Error(`Item ${inItem.itemId} is not part of Purchase Order ${po.poNumber}.`);
-      }
-
-      if (inItem.acceptedQty < 0 || inItem.receivedQty < 0) {
-        throw new Error('Quantities cannot be negative.');
-      }
-
-      if (inItem.acceptedQty + (inItem.rejectedQty || 0) > inItem.receivedQty) {
-        throw new Error('Accepted quantity + Rejected quantity cannot exceed Received quantity.');
-      }
-
-      const remainingAllowed = poItem.quantity - poItem.receivedQty;
-      if (inItem.acceptedQty > remainingAllowed) {
-        throw new Error(
-          `Over-receiving prevented: Accepted quantity (${inItem.acceptedQty}) exceeds remaining allowed quantity (${remainingAllowed}) for item in PO ${po.poNumber}.`
-        );
-      }
-    }
-
     const inwardNumber = data.inwardNumber || (await this.generateInwardNumber());
 
-    // 3. Execute atomic transaction
+    // Execute atomic transaction with all validations protected inside
     const result = await prisma.$transaction(async (tx) => {
-      // Create Material Inward header
+      // 1. Fetch and validate Purchase Order inside transaction
+      const po = await tx.purchaseOrder.findUnique({
+        where: { id: data.poId },
+        include: {
+          items: true,
+        },
+      });
+
+      if (!po) {
+        throw new Error('Invalid Purchase Order referenced.');
+      }
+
+      if (po.status === POStatus.CANCELLED) {
+        throw new Error('Cannot create Material Inward against a CANCELLED Purchase Order.');
+      }
+
+      if (po.status === POStatus.RECEIVED) {
+        throw new Error('Purchase Order has already been fully received.');
+      }
+
+      // 2. Validate items and verify against over-receiving
+      for (const inItem of data.items) {
+        const poItem = po.items.find((p) => p.itemId === inItem.itemId);
+        if (!poItem) {
+          throw new Error(`Item ${inItem.itemId} is not part of Purchase Order ${po.poNumber}.`);
+        }
+
+        if (inItem.acceptedQty < 0 || inItem.receivedQty < 0) {
+          throw new Error('Quantities cannot be negative.');
+        }
+
+        if (inItem.acceptedQty + (inItem.rejectedQty || 0) > inItem.receivedQty) {
+          throw new Error('Accepted quantity + Rejected quantity cannot exceed Received quantity.');
+        }
+
+        const remainingAllowed = poItem.quantity - poItem.receivedQty;
+        if (inItem.acceptedQty > remainingAllowed) {
+          throw new Error(
+            `Over-receiving prevented: Accepted quantity (${inItem.acceptedQty}) exceeds remaining allowed quantity (${remainingAllowed}) for item in PO ${po.poNumber}.`
+          );
+        }
+      }
+
+      // 3. Create Material Inward header
       const inward = await tx.materialInward.create({
         data: {
           inwardNumber,
@@ -217,7 +236,7 @@ export class InwardService {
       });
 
       return inward;
-    });
+    }, { maxWait: 10000, timeout: 20000 });
 
     return this.getInwardById(result.id);
   }

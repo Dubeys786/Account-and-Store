@@ -225,6 +225,45 @@ export async function initDatabase(): Promise<void> {
       console.warn('Phase 8 schema column check:', e.message || e);
     }
 
+    // Return Age Tracking & Damaged Stock Schema Evolution
+    try {
+      await pglite.exec(`
+        ALTER TABLE "stock_transactions" ADD COLUMN IF NOT EXISTS "original_issue_id" TEXT REFERENCES "stock_transactions"("id");
+        ALTER TABLE "stock_transactions" ADD COLUMN IF NOT EXISTS "return_date" TIMESTAMP(3);
+        ALTER TABLE "stock_transactions" ADD COLUMN IF NOT EXISTS "condition" TEXT DEFAULT 'Good';
+        ALTER TABLE "stock_transactions" ADD COLUMN IF NOT EXISTS "return_reason" TEXT;
+        ALTER TABLE "stock_transactions" ADD COLUMN IF NOT EXISTS "days_held" INTEGER;
+        ALTER TABLE "items" ADD COLUMN IF NOT EXISTS "damaged_stock" DOUBLE PRECISION DEFAULT 0;
+      `);
+      console.log('✅ Return Age Tracking & Damaged Stock schema columns verified.');
+    } catch (e: any) {
+      console.warn('Return Age schema evolution check:', e.message || e);
+    }
+
+    // Notification System Schema
+    try {
+      await pglite.exec(`
+        CREATE TABLE IF NOT EXISTS "notifications" (
+          "id" TEXT PRIMARY KEY,
+          "user_id" TEXT NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+          "title" TEXT NOT NULL,
+          "message" TEXT NOT NULL,
+          "type" TEXT NOT NULL DEFAULT 'SYSTEM',
+          "reference_type" TEXT NOT NULL,
+          "reference_id" TEXT,
+          "is_read" BOOLEAN NOT NULL DEFAULT false,
+          "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "read_at" TIMESTAMP(3)
+        );
+        CREATE INDEX IF NOT EXISTS "notifications_user_id_is_read_idx" ON "notifications"("user_id", "is_read");
+        CREATE INDEX IF NOT EXISTS "notifications_user_id_created_at_idx" ON "notifications"("user_id", "created_at");
+        CREATE INDEX IF NOT EXISTS "notifications_ref_idx" ON "notifications"("reference_type", "reference_id");
+      `);
+      console.log('✅ Notification system schema verified.');
+    } catch (e: any) {
+      console.warn('Notification schema check:', e.message || e);
+    }
+
     // RBAC System: Ensure roles, permissions, role_permissions, user_roles tables exist
     try {
       const roleTableRes = await pglite.query<{ count: string }>(

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { POService } from './po.service';
 import { POStatus, UserRole } from '@prisma/client';
 import { AuditService } from '../../audit/audit.service';
+import { NotificationService } from '../../notification/notification.service';
 
 export class POController {
   static async getPurchaseOrders(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -111,6 +112,15 @@ export class POController {
         userAgent: req.headers['user-agent'],
       });
 
+      // Notify store users
+      await NotificationService.notifyStoreUsers(po.storeId, {
+        title: 'New Purchase Order',
+        message: `Purchase Order ${po.poNumber} has been created for ₹${Number(po.totalAmount).toLocaleString()}.`,
+        type: 'STORE',
+        referenceType: 'purchase_order',
+        referenceId: po.id,
+      });
+
       res.status(201).json({
         success: true,
         message: 'Purchase order created successfully.',
@@ -154,6 +164,16 @@ export class POController {
         ipAddress: req.ip || req.socket.remoteAddress,
         userAgent: req.headers['user-agent'],
       });
+
+      if (status === POStatus.APPROVED) {
+        await NotificationService.notifyStoreUsers(updated.storeId, {
+          title: 'Purchase Order Approved',
+          message: `Purchase Order ${updated.poNumber} has been approved.`,
+          type: 'STORE',
+          referenceType: 'purchase_order',
+          referenceId: updated.id,
+        });
+      }
 
       res.status(200).json({
         success: true,

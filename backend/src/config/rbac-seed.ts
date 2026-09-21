@@ -113,8 +113,8 @@ export const ROLE_DEFINITIONS: Record<string, { description: string; permissions
     permissions: STORE_PERMISSIONS,
   },
   ACCOUNT_AND_STORE_INCHARGE: {
-    description: 'Account & Store Incharge with primary access to Accounts & Finance',
-    permissions: ACCOUNTS_PERMISSIONS,
+    description: 'Account & Store Incharge with full operational authority over Accounts & Finance and Store & Inventory',
+    permissions: [...ACCOUNTS_PERMISSIONS, ...STORE_PERMISSIONS],
   },
   STORE_MANAGER: {
     description: 'Store Manager operational role',

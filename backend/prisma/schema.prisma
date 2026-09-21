@@ -110,6 +110,7 @@ model User {
   storeUsers   StoreUser[]
   userRoles    UserRoleAssignment[]
   auditLogs    AuditLog[]
+  notifications Notification[]
   profile      Profile?
 
   @@map("users")
@@ -240,6 +241,7 @@ model Item {
   maxStock     Float    @default(1000)
   reorderLevel Float    @default(10)
   currentStock Float    @default(0)
+  damagedStock Float    @default(0) @map("damaged_stock")
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -352,11 +354,22 @@ model StockTransaction {
   notes           String?
   createdAt       DateTime             @default(now())
 
+  // Return tracking fields
+  originalIssueId String?              @map("original_issue_id")
+  returnDate      DateTime?            @map("return_date")
+  condition       String?              @default("Good")
+  returnReason    String?              @map("return_reason")
+  daysHeld        Int?                 @map("days_held")
+
   store Store @relation(fields: [storeId], references: [id])
   item  Item  @relation(fields: [itemId], references: [id])
 
+  originalIssue   StockTransaction?   @relation("IssueReturns", fields: [originalIssueId], references: [id])
+  returns         StockTransaction[]  @relation("IssueReturns")
+
   @@index([storeId, itemId])
   @@index([createdAt])
+  @@index([originalIssueId])
   @@map("stock_transactions")
 }
 
@@ -616,3 +629,28 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
+
+// ==========================================
+// 5. NOTIFICATIONS
+// ==========================================
+
+model Notification {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  title         String
+  message       String
+  type          String    @default("SYSTEM") // STORE, ACCOUNTS, SYSTEM, INFO, WARNING, SUCCESS
+  referenceType String    @map("reference_type") // purchase_order, material_inward, item_return, stock_issue, low_stock, payment, receipt, expense, income
+  referenceId   String?   @map("reference_id")
+  isRead        Boolean   @default(false) @map("is_read")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  readAt        DateTime? @map("read_at")
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@index([referenceType, referenceId])
+  @@map("notifications")
+}
+

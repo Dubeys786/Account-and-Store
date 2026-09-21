@@ -55,16 +55,42 @@ export const POMasterPage: React.FC = () => {
     setLoading(false);
   };
 
-  // Fetch Lookups
+  // Decimal rounding helper for financial safety
+  const round2 = (num: number): number => Math.round((num + Number.EPSILON) * 100) / 100;
+
+  // Calculate single line total
+  const computeLineTotal = (qty: number, rate: number, disc: number, tax: number): number => {
+    const gross = round2((qty || 0) * (rate || 0));
+    const discAmount = round2(gross * ((disc || 0) / 100));
+    const taxable = round2(gross - discAmount);
+    const taxAmount = round2(taxable * ((tax || 0) / 100));
+    return round2(taxable + taxAmount);
+  };
+
+  // Fetch Lookups from real database
   const fetchLookups = async () => {
     const [itemsRes, suppliersRes, storesRes] = await Promise.all([
       apiRequest('/store/items?limit=100'),
       apiRequest('/store/suppliers'),
       apiRequest('/store/stores'),
     ]);
-    if (itemsRes.success && itemsRes.data?.items) setItemsList(itemsRes.data.items);
-    if (suppliersRes.success && suppliersRes.data) setSuppliersList(suppliersRes.data);
-    if (storesRes.success && storesRes.data) setStoresList(storesRes.data);
+
+    const items = Array.isArray(itemsRes.data)
+      ? itemsRes.data
+      : itemsRes.data?.items || [];
+    setItemsList(items);
+
+    const suppliers = Array.isArray(suppliersRes.data)
+      ? suppliersRes.data
+      : suppliersRes.data?.suppliers || [];
+    setSuppliersList(suppliers);
+
+    const stores = Array.isArray(storesRes.data)
+      ? storesRes.data
+      : storesRes.data?.stores || [];
+    setStoresList(stores);
+
+    return { items, suppliers, stores };
   };
 
   useEffect(() => {
@@ -73,41 +99,45 @@ export const POMasterPage: React.FC = () => {
   }, [statusFilter]);
 
   // Open Create PO Modal
-  const handleOpenCreate = () => {
-    setFormPartyId(suppliersList[0]?.id || '');
-    setFormStoreId(storesList[0]?.id || '');
+  const handleOpenCreate = async () => {
+    setCreateError('');
+    // Refresh lookups to guarantee current real database records
+    const { items, suppliers, stores } = await fetchLookups();
+
+    const selectedParty = suppliers.length > 0 ? suppliers[0].id : '';
+    const selectedStore = stores.length > 0 ? stores[0].id : '';
+
+    setFormPartyId(selectedParty);
+    setFormStoreId(selectedStore);
     setFormExpectedDelivery('');
     setFormNotes('');
-    setCreateError('');
 
-    // Default first line if items available
-    if (itemsList.length > 0) {
-      const first = itemsList[0];
+    // Default first line if items exist in database
+    if (items.length > 0) {
+      const first = items[0];
+      const initialQty = 10;
+      const initialRate = 100;
+      const initialDisc = 0;
+      const initialTax = 18;
+      const lineTotal = computeLineTotal(initialQty, initialRate, initialDisc, initialTax);
+
       setLineItems([
         {
           itemId: first.id,
           itemCode: first.code,
           itemName: first.name,
-          unit: first.unit,
-          quantity: 10,
-          rate: 100,
-          discountPercent: 0,
-          taxPercent: 18,
-          total: 10 * 100 * 1.18,
+          unit: first.unit || 'PCS',
+          quantity: initialQty,
+          rate: initialRate,
+          discountPercent: initialDisc,
+          taxPercent: initialTax,
+          total: lineTotal,
         },
       ]);
     } else {
       setLineItems([]);
     }
     setIsCreateOpen(true);
-  };
-
-  // Recalculate row total
-  const computeRowTotal = (qty: number, rate: number, disc: number, tax: number) => {
-    const base = (qty || 0) * (rate || 0);
-    const afterDiscount = base - base * ((disc || 0) / 100);
-    const withTax = afterDiscount + afterDiscount * ((tax || 0) / 100);
-    return Math.round(withTax * 100) / 100;
   };
 
   // Update line item
@@ -124,7 +154,7 @@ export const POMasterPage: React.FC = () => {
       }
     }
 
-    row.total = computeRowTotal(
+    row.total = computeLineTotal(
       Number(row.quantity),
       Number(row.rate),
       Number(row.discountPercent),
@@ -136,10 +166,24 @@ export const POMasterPage: React.FC = () => {
 
   // Add line item
   const addLineItem = () => {
-    // Pick first unused item
+    if (itemsList.length === 0) {
+      setCreateError('No items available. Please create an item first.');
+      return;
+    }
+
+    // Pick first unused item or fallback to first item
     const usedIds = new Set(lineItems.map((l) => l.itemId));
     const available = itemsList.find((it) => !usedIds.has(it.id)) || itemsList[0];
-    if (!available) return;
+    if (!available) {
+      setCreateError('No items available. Please create an item first.');
+      return;
+    }
+
+    const defaultQty = 1;
+    const defaultRate = 50;
+    const defaultDisc = 0;
+    const defaultTax = 18;
+    const defaultTotal = computeLineTotal(defaultQty, defaultRate, defaultDisc, defaultTax);
 
     setLineItems([
       ...lineItems,
@@ -147,12 +191,12 @@ export const POMasterPage: React.FC = () => {
         itemId: available.id,
         itemCode: available.code,
         itemName: available.name,
-        unit: available.unit,
-        quantity: 1,
-        rate: 50,
-        discountPercent: 0,
-        taxPercent: 18,
-        total: 59,
+        unit: available.unit || 'PCS',
+        quantity: defaultQty,
+        rate: defaultRate,
+        discountPercent: defaultDisc,
+        taxPercent: defaultTax,
+        total: defaultTotal,
       },
     ]);
   };
@@ -167,11 +211,24 @@ export const POMasterPage: React.FC = () => {
     setCreateError('');
   };
 
-  // Compute PO Totals
-  const subtotal = lineItems.reduce((sum, line) => sum + (line.quantity * line.rate), 0);
-  const totalDiscount = lineItems.reduce((sum, line) => sum + (line.quantity * line.rate * (line.discountPercent / 100)), 0);
-  const grandTotal = lineItems.reduce((sum, line) => sum + line.total, 0);
-  const totalTax = grandTotal - (subtotal - totalDiscount);
+  // Compute PO Totals with decimal-safe calculations
+  let subtotal = 0;
+  let totalDiscount = 0;
+  let totalTax = 0;
+  let grandTotal = 0;
+
+  for (const line of lineItems) {
+    const gross = round2((Number(line.quantity) || 0) * (Number(line.rate) || 0));
+    const disc = round2(gross * ((Number(line.discountPercent) || 0) / 100));
+    const taxable = round2(gross - disc);
+    const tax = round2(taxable * ((Number(line.taxPercent) || 0) / 100));
+    const total = round2(taxable + tax);
+
+    subtotal = round2(subtotal + gross);
+    totalDiscount = round2(totalDiscount + disc);
+    totalTax = round2(totalTax + tax);
+    grandTotal = round2(grandTotal + total);
+  }
 
   // Submit PO
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -179,33 +236,45 @@ export const POMasterPage: React.FC = () => {
     setCreateError('');
 
     if (!formPartyId) {
-      setCreateError('Please select a Supplier/Party.');
+      setCreateError('Supplier is required. Please select a supplier.');
       return;
     }
     if (!formStoreId) {
-      setCreateError('Please select a Store destination.');
+      setCreateError('Destination Store is required. Please select a store.');
       return;
     }
     if (lineItems.length === 0) {
-      setCreateError('Add at least one line item.');
+      setCreateError('At least one item line is required. Please add an item line.');
       return;
     }
 
-    // Check for duplicates
+    // Check for duplicate items
     const itemIds = lineItems.map((l) => l.itemId);
     if (new Set(itemIds).size !== itemIds.length) {
       setCreateError('Duplicate items detected. Each item may only appear once per Purchase Order.');
       return;
     }
 
-    // Check quantities and rates
+    // Check quantities, rates, discounts, taxes
     for (const item of lineItems) {
-      if (!item.quantity || item.quantity <= 0) {
-        setCreateError('All item quantities must be greater than 0.');
+      if (!item.itemId) {
+        setCreateError('Please select an item for all lines.');
         return;
       }
-      if (item.rate < 0) {
-        setCreateError('Rates cannot be negative.');
+      if (!item.quantity || item.quantity <= 0) {
+        setCreateError(`Quantity must be greater than 0 for ${item.itemName || 'item'}.`);
+        return;
+      }
+      if (item.rate === undefined || item.rate < 0) {
+        setCreateError(`Unit rate cannot be negative for ${item.itemName || 'item'}.`);
+        return;
+      }
+      if (item.discountPercent < 0 || item.discountPercent > 100) {
+        setCreateError(`Discount % must be between 0 and 100 for ${item.itemName || 'item'}.`);
+        return;
+      }
+      if (item.taxPercent < 0 || item.taxPercent > 100) {
+        setCreateError(`GST % must be between 0 and 100 for ${item.itemName || 'item'}.`);
         return;
       }
     }
@@ -315,7 +384,7 @@ export const POMasterPage: React.FC = () => {
       {/* Main Table Card */}
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
             <div className="relative w-full sm:w-80">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -432,11 +501,11 @@ export const POMasterPage: React.FC = () => {
         title="Create New Purchase Order"
         size="4xl"
         footer={
-          <div className="flex items-center justify-between w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
             <div className="text-xs text-slate-500">
               Total Order Value: <span className="font-bold text-slate-900 font-mono text-sm ml-1">₹ {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
               <Button variant="outline" size="sm" onClick={() => setIsCreateOpen(false)}>
                 Cancel
               </Button>
@@ -474,7 +543,7 @@ export const POMasterPage: React.FC = () => {
                   className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 >
-                  <option value="">Select Supplier</option>
+                  <option value="">{suppliersList.length === 0 ? 'No suppliers available. Please create a supplier first.' : 'Select Supplier / Vendor'}</option>
                   {suppliersList.map((sup) => (
                     <option key={sup.id} value={sup.id}>
                       {sup.name} ({sup.code})
@@ -482,6 +551,11 @@ export const POMasterPage: React.FC = () => {
                   ))}
                 </select>
               </div>
+              {suppliersList.length === 0 && (
+                <p className="text-[11px] text-amber-600 mt-1">
+                  No suppliers available. Please create a supplier first.
+                </p>
+              )}
             </div>
 
             <div>
@@ -496,7 +570,7 @@ export const POMasterPage: React.FC = () => {
                   className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 >
-                  <option value="">Select Store</option>
+                  <option value="">{storesList.length === 0 ? 'No stores available.' : 'Select Destination Store'}</option>
                   {storesList.map((st) => (
                     <option key={st.id} value={st.id}>
                       {st.name} ({st.code})
@@ -504,6 +578,11 @@ export const POMasterPage: React.FC = () => {
                   ))}
                 </select>
               </div>
+              {storesList.length === 0 && (
+                <p className="text-[11px] text-amber-600 mt-1">
+                  No stores available.
+                </p>
+              )}
             </div>
 
             <div>
@@ -551,8 +630,14 @@ export const POMasterPage: React.FC = () => {
               </Button>
             </div>
 
+            {itemsList.length === 0 && (
+              <div className="p-3 mb-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+                No items available. Please create an item first.
+              </div>
+            )}
+
             <div className="overflow-x-auto border border-slate-200 rounded-lg">
-              <table className="w-full text-xs text-left">
+              <table className="w-full text-xs text-left min-w-[650px]">
                 <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                   <tr>
                     <th className="p-2.5 w-48">Item</th>
@@ -574,11 +659,15 @@ export const POMasterPage: React.FC = () => {
                           onChange={(e) => updateLine(idx, 'itemId', e.target.value)}
                           className="w-full px-2 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                         >
-                          {itemsList.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.code} - {item.name}
-                            </option>
-                          ))}
+                          {itemsList.length === 0 ? (
+                            <option value="" disabled>No items available. Please create an item first.</option>
+                          ) : (
+                            itemsList.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.code} - {item.name}
+                              </option>
+                            ))
+                          )}
                         </select>
                       </td>
                       <td className="p-2">
@@ -646,7 +735,7 @@ export const POMasterPage: React.FC = () => {
 
             {/* Calculations Summary Box */}
             <div className="mt-4 flex justify-end">
-              <div className="w-72 bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5 text-xs">
+              <div className="w-full sm:w-72 bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5 text-xs">
                 <div className="flex justify-between text-slate-600">
                   <span>Subtotal:</span>
                   <span className="font-mono">₹ {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
@@ -676,7 +765,7 @@ export const POMasterPage: React.FC = () => {
         title={viewingPO ? `Purchase Order: ${viewingPO.poNumber}` : 'PO Details'}
         size="4xl"
         footer={
-          <div className="flex items-center justify-between w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
             <div className="flex items-center gap-2">
               {viewingPO?.status === 'PENDING' && (
                 <Button
@@ -753,7 +842,7 @@ export const POMasterPage: React.FC = () => {
             <div>
               <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">Ordered Items &amp; Fulfillment</h4>
               <div className="overflow-x-auto border border-slate-200 rounded-lg">
-                <table className="w-full text-xs text-left">
+                <table className="w-full text-xs text-left min-w-[650px]">
                   <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                     <tr>
                       <th className="p-2.5">Item Code</th>
@@ -791,7 +880,7 @@ export const POMasterPage: React.FC = () => {
 
             {/* Total breakdown */}
             <div className="flex justify-end">
-              <div className="w-64 bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1 text-xs">
+              <div className="w-full sm:w-64 bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1 text-xs">
                 <div className="flex justify-between text-slate-600">
                   <span>Subtotal:</span>
                   <span className="font-mono">₹ {Number(viewingPO.subtotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
@@ -816,7 +905,7 @@ export const POMasterPage: React.FC = () => {
               <div>
                 <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">Material Inwards Against This PO</h4>
                 <div className="overflow-x-auto border border-slate-200 rounded-lg">
-                  <table className="w-full text-xs text-left">
+                  <table className="w-full text-xs text-left min-w-[500px]">
                     <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                       <tr>
                         <th className="p-2.5">Inward No</th>

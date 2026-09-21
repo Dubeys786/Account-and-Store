@@ -61,65 +61,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
   const hasMultipleWorkspaces =
     accessibleWorkspaces.store && accessibleWorkspaces.accounts;
 
+  // Close drawer on Escape key
+  React.useEffect(() => {
+    if (!mobileOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && onCloseMobile) {
+        onCloseMobile();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileOpen, onCloseMobile]);
+
   const navSections: NavSectionConfig[] = [
-    {
-      title: 'OVERVIEW',
-      items: [
-        ...(accessibleWorkspaces.store
-          ? [
-              {
-                name: 'Store Dashboard',
-                path: '/store',
-                icon: LayoutDashboard,
-                permission: 'store.view',
-              },
-            ]
-          : []),
-        ...(accessibleWorkspaces.accounts
-          ? [
-              {
-                name: 'Accounts Dashboard',
-                path: '/accounts',
-                icon: PieChart,
-                permission: 'accounts.view',
-              },
-            ]
-          : []),
-      ],
-    },
-    {
-      title: 'MASTER DATA',
-      workspace: 'store',
-      items: [
-        { name: 'Item Master', path: '/store/items', icon: Package, permission: 'item.view' },
-        { name: 'PO Master', path: '/store/purchase-orders', icon: FileText, permission: 'po.view' },
-      ],
-    },
-    {
-      title: 'TRANSACTIONS',
-      workspace: 'store',
-      items: [
-        {
-          name: 'Material Inward',
-          path: '/store/material-inwards',
-          icon: ArrowDownToLine,
-          permission: 'material_inward.view',
-        },
-      ],
-    },
-    {
-      title: 'INVENTORY',
-      workspace: 'store',
-      items: [
-        { name: 'Stock Register', path: '/store/stock-register', icon: Layers, permission: 'stock.view' },
-        { name: 'Issue / Return', path: '/store/issue-return', icon: ArrowLeftRight, permission: 'stock.issue' },
-        { name: 'Store Reports', path: '/store/reports', icon: BarChart3, permission: 'store_reports.view' },
-      ],
-    },
     {
       title: 'ACCOUNTS & FINANCE',
       workspace: 'accounts',
       items: [
+        { name: 'Accounts Dashboard', path: '/accounts', icon: PieChart, permission: 'accounts.view' },
         { name: 'Party Master', path: '/accounts/parties', icon: Users, permission: 'party.view' },
         { name: 'Purchase Accounts', path: '/accounts/purchases', icon: ShoppingBag, permission: 'purchase.view' },
         { name: 'Party Ledger', path: '/accounts/ledger', icon: BookOpen, permission: 'ledger.view' },
@@ -133,6 +92,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
         { name: 'Cash Book', path: '/accounts/cash-book', icon: DollarSign, permission: 'cash_book.view' },
         { name: 'Bank Book', path: '/accounts/bank-book', icon: Building, permission: 'bank_book.view' },
         { name: 'Accounts Reports', path: '/accounts/reports', icon: BarChart3, permission: 'accounting_reports.view' },
+      ],
+    },
+    {
+      title: 'STORE & INVENTORY',
+      workspace: 'store',
+      items: [
+        { name: 'Store Dashboard', path: '/store', icon: LayoutDashboard, permission: 'store.view' },
+        { name: 'Item Master', path: '/store/items', icon: Package, permission: 'item.view' },
+        { name: 'PO Master', path: '/store/purchase-orders', icon: FileText, permission: 'po.view' },
+        { name: 'Material Inward', path: '/store/material-inwards', icon: ArrowDownToLine, permission: 'material_inward.view' },
+        { name: 'Stock Register', path: '/store/stock-register', icon: Layers, permission: 'stock.view' },
+        { name: 'Issue / Return', path: '/store/issue-return', icon: ArrowLeftRight, permission: 'stock.issue' },
+        { name: 'Store Reports', path: '/store/reports', icon: BarChart3, permission: 'store_reports.view' },
       ],
     },
   ];
@@ -191,22 +163,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
           </div>
         )}
 
-        {/* Switch Workspace Quick Button (for multi-domain users) */}
-        {hasMultipleWorkspaces && (
-          <div className="px-3 pt-3">
-            <button
-              onClick={() => navigate('/workspace')}
-              className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <LayoutGrid className="w-3.5 h-3.5 text-blue-400" />
-                <span>Switch Workspace</span>
-              </div>
-              <span className="text-[10px] text-slate-500 font-mono">⌘W</span>
-            </button>
-          </div>
-        )}
-
         {/* Navigation List */}
         <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6 custom-scrollbar">
           {navSections.map((section) => {
@@ -241,10 +197,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
                       location.pathname === item.path ||
                       (item.path === '/store' && (location.pathname === '/store' || location.pathname === '/dashboard')) ||
                       (item.path === '/accounts' && (location.pathname === '/accounts' || location.pathname === '/accounts/dashboard')) ||
+                      (item.path === '/store/material-inwards' && (location.pathname === '/store/material-inwards' || location.pathname === '/store/material-inward')) ||
+                      (item.path === '/store/stock-register' && (location.pathname === '/store/stock-register' || location.pathname === '/store/stock')) ||
                       (item.path !== '/store' &&
                         item.path !== '/dashboard' &&
                         item.path !== '/accounts' &&
                         item.path !== '/accounts/dashboard' &&
+                        item.path !== '/store/material-inwards' &&
+                        item.path !== '/store/stock-register' &&
                         location.pathname.startsWith(item.path));
 
                     return (
