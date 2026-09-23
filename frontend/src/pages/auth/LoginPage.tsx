@@ -15,9 +15,20 @@ export const LoginPage: React.FC = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!email.trim()) {
+      setError('Email address is required.');
+      return;
+    }
+
+    if (!password) {
+      setError('Password is required.');
+      return;
+    }
+
     setIsSubmitting(true);
 
-    const result = await login(email, password);
+    const result = await login(email.trim(), password);
     setIsSubmitting(false);
 
     if (result.success && result.user) {

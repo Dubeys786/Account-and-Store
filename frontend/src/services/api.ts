@@ -6,14 +6,28 @@
  * - Dev proxy fallback vs production
  */
 export function getApiBaseUrl(): string {
-  const envUrl =
+  // Support optional runtime global configuration
+  const runtimeUrl = typeof window !== 'undefined' ? (window as any).__STOCKLEDGER_API_URL__ : undefined;
+
+  const rawEnvUrl =
+    runtimeUrl ||
     (import.meta as any).env?.VITE_API_BASE_URL ||
     (import.meta as any).env?.VITE_API_URL ||
     '';
 
-  if (envUrl && typeof envUrl === 'string') {
-    const cleaned = envUrl.trim().replace(/\/+$/, '');
+  if (rawEnvUrl && typeof rawEnvUrl === 'string') {
+    const cleaned = rawEnvUrl.trim().replace(/\/+$/, '');
     if (cleaned) {
+      // In remote environments (e.g. Vercel deployment), do not use baked-in localhost/127.0.0.1
+      if (
+        typeof window !== 'undefined' &&
+        window.location.hostname !== 'localhost' &&
+        window.location.hostname !== '127.0.0.1' &&
+        (cleaned.includes('localhost') || cleaned.includes('127.0.0.1'))
+      ) {
+        return '/api/v1';
+      }
+
       if (cleaned.endsWith('/api/v1') || cleaned.endsWith('/api')) {
         return cleaned;
       }
@@ -56,6 +70,35 @@ export function buildApiUrl(endpoint: string): string {
  * Maps HTTP response statuses to user-friendly messages without exposing internal URLs or stack traces.
  */
 function formatErrorMessage(status: number, data: any, endpoint: string): string {
+  const isAuthRoute = endpoint.includes('/auth/');
+
+  if (isAuthRoute) {
+    switch (status) {
+      case 400:
+      case 422:
+        return data?.message && typeof data.message === 'string' && !data.message.includes('<!DOCTYPE')
+          ? data.message
+          : 'Invalid request format. Please check your credentials and try again.';
+      case 401:
+        return 'Invalid email or password.';
+      case 403:
+        return 'You are not authorized to access this workspace.';
+      case 404:
+        return 'Authentication endpoint was not found. Please check the API configuration.';
+      case 429:
+        return 'Too many login attempts. Please wait a moment and try again.';
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        return 'Authentication server encountered an error.';
+      default:
+        return data?.message && typeof data.message === 'string' && !data.message.includes('<!DOCTYPE')
+          ? data.message
+          : `Authentication failed (${status}). Please try again later.`;
+    }
+  }
+
   if (
     data?.message &&
     typeof data.message === 'string' &&
@@ -66,27 +109,23 @@ function formatErrorMessage(status: number, data: any, endpoint: string): string
     return data.message;
   }
 
-  const isAuthRoute = endpoint.includes('/auth/');
-
   switch (status) {
     case 400:
     case 422:
-      return 'Invalid request format. Please check your credentials and try again.';
+      return 'Invalid request format. Please check your input and try again.';
     case 401:
-      return 'Invalid email or password.';
+      return 'Session expired or unauthorized. Please sign in again.';
     case 403:
-      return 'Account access is restricted or unauthorized. Please contact your system administrator.';
+      return 'Access is restricted or unauthorized.';
     case 404:
-      return isAuthRoute
-        ? 'Unable to connect to the authentication service. Please try again.'
-        : 'The requested resource was not found.';
+      return 'The requested resource was not found.';
     case 429:
-      return 'Too many login attempts. Please wait a moment and try again.';
+      return 'Too many requests. Please wait a moment and try again.';
     case 500:
     case 502:
     case 503:
     case 504:
-      return 'Authentication service is temporarily unavailable.';
+      return 'Server encountered an error. Please try again later.';
     default:
       return `Service error (${status}). Please try again later.`;
   }
@@ -145,7 +184,7 @@ export async function apiRequest<T = any>(
     return {
       success: false,
       message: isAuthRoute
-        ? 'Authentication service is temporarily unavailable.'
+        ? 'Unable to connect to the authentication service.'
         : error.message || 'Network error occurred. Please check your server connection.',
     };
   }
