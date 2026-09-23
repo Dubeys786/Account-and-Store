@@ -299,7 +299,7 @@ export const ReceiptsPage: React.FC = () => {
             Record customer receipts, settle sales invoices, and update Party Ledgers & Cash/Bank books
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             variant="outline"
@@ -323,7 +323,7 @@ export const ReceiptsPage: React.FC = () => {
       </div>
 
       {/* Metrics Banner */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <Card className="border-l-4 border-l-blue-600 bg-linear-to-br from-white to-slate-50/50">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -375,8 +375,8 @@ export const ReceiptsPage: React.FC = () => {
       {/* Filter and Table */}
       <Card>
         <CardHeader className="py-3">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="relative w-full sm:w-80">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+            <div className="relative w-full sm:w-72">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
@@ -386,7 +386,7 @@ export const ReceiptsPage: React.FC = () => {
                 className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
               />
             </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
                 <Filter className="w-3.5 h-3.5" />
                 <span>Method:</span>
@@ -394,7 +394,7 @@ export const ReceiptsPage: React.FC = () => {
               <select
                 value={methodFilter}
                 onChange={(e) => setMethodFilter(e.target.value)}
-                className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 sm:flex-initial text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="ALL">All Methods</option>
                 {PAYMENT_METHODS.map((m) => (
@@ -406,7 +406,7 @@ export const ReceiptsPage: React.FC = () => {
               <select
                 value={storeFilter}
                 onChange={(e) => setStoreFilter(e.target.value)}
-                className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 sm:flex-initial text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="ALL">All Stores</option>
                 {stores.map((s) => (
@@ -419,8 +419,7 @@ export const ReceiptsPage: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
+          <Table className="min-w-[850px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Voucher #</TableHead>
@@ -497,7 +496,6 @@ export const ReceiptsPage: React.FC = () => {
                 )}
               </TableBody>
             </Table>
-          </div>
         </CardContent>
       </Card>
 

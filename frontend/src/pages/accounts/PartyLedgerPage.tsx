@@ -534,18 +534,17 @@ export const PartyLedgerPage: React.FC = () => {
             Date, Transaction, Reference, Debit, Credit, Balance
         */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between py-3">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-3">
             <div className="flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-blue-600" />
               <CardTitle>Chronological Statement of Accounts</CardTitle>
             </div>
-            <span className="text-xs font-semibold text-slate-500">
+            <span className="text-xs font-semibold text-slate-500 self-end sm:self-auto">
               {filteredEntries.length} Ledger Line Items
             </span>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
+            <Table className="min-w-[650px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
@@ -698,7 +697,6 @@ export const PartyLedgerPage: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </div>
           </CardContent>
         </Card>
       </div>

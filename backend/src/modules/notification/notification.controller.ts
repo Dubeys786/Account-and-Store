@@ -26,7 +26,12 @@ export class NotificationController {
         success: true,
         message: 'Notifications retrieved successfully.',
         data: result.notifications,
-        pagination: result.pagination,
+        pagination: {
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          totalPages: result.totalPages,
+        },
         unreadCount: result.unreadCount,
       });
     } catch (error: any) {

@@ -304,7 +304,7 @@ export const IncomePage: React.FC = () => {
             Log sales revenue, commission, interest earned, scrap sales, and auxiliary revenues with double-entry journal posting
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <Button
             size="sm"
             variant="outline"
@@ -339,7 +339,7 @@ export const IncomePage: React.FC = () => {
       )}
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
           <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Income Recorded</span>
           <p className="text-xl font-bold text-emerald-600 mt-1">
@@ -435,7 +435,7 @@ export const IncomePage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-slate-500 font-medium">Date Range:</span>
               <input
                 type="date"
@@ -472,93 +472,91 @@ export const IncomePage: React.FC = () => {
           <span className="text-xs font-semibold text-slate-500">{incomeList.length} Records Found</span>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
+          <Table className="min-w-[800px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Voucher #</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Party / Remitter</TableHead>
+                <TableHead>Store</TableHead>
+                <TableHead>Receipt Mode</TableHead>
+                <TableHead>Reference</TableHead>
+                <TableHead className="text-right">Amount (₹)</TableHead>
+                <TableHead className="text-center">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
                 <TableRow>
-                  <TableHead>Voucher #</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Party / Remitter</TableHead>
-                  <TableHead>Store</TableHead>
-                  <TableHead>Receipt Mode</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead className="text-right">Amount (₹)</TableHead>
-                  <TableHead className="text-center">Action</TableHead>
+                  <TableCell colSpan={9} className="text-center py-12 text-slate-400">
+                    <div className="flex items-center justify-center gap-2">
+                      <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
+                      <span>Loading income records from database...</span>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-12 text-slate-400">
-                      <div className="flex items-center justify-center gap-2">
-                        <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
-                        <span>Loading income records from database...</span>
-                      </div>
+              ) : incomeList.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-10 text-slate-400">
+                    No income records match current criteria.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                incomeList.map((inc) => (
+                  <TableRow key={inc.id} className="hover:bg-slate-50/80 transition-colors">
+                    <TableCell className="font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
+                      {inc.incomeNumber}
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-600 whitespace-nowrap">
+                      {new Date(inc.incomeDate).toLocaleDateString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="neutral">{inc.category}</Badge>
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {inc.party ? (
+                        <div className="font-medium text-slate-800">
+                          {inc.party.name}{' '}
+                          <span className="text-[10px] text-slate-500 font-normal">({inc.party.code})</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">Direct / N/A</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-600">
+                      {inc.store?.name || '—'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={inc.paymentMode === 'CASH' ? 'warning' : 'blue'}>
+                        {inc.paymentMode}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-500 font-mono">
+                      {inc.referenceNo || '—'}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs font-bold text-emerald-600 text-right whitespace-nowrap">
+                      + ₹ {inc.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0"
+                        onClick={() => setSelectedIncome(inc)}
+                      >
+                        <Eye className="w-3.5 h-3.5 text-slate-600" />
+                      </Button>
                     </TableCell>
                   </TableRow>
-                ) : incomeList.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-10 text-slate-400">
-                      No income records match current criteria.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  incomeList.map((inc) => (
-                    <TableRow key={inc.id} className="hover:bg-slate-50/80 transition-colors">
-                      <TableCell className="font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
-                        {inc.incomeNumber}
-                      </TableCell>
-                      <TableCell className="text-xs text-slate-600 whitespace-nowrap">
-                        {new Date(inc.incomeDate).toLocaleDateString('en-IN', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="neutral">{inc.category}</Badge>
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {inc.party ? (
-                          <div className="font-medium text-slate-800">
-                            {inc.party.name}{' '}
-                            <span className="text-[10px] text-slate-500 font-normal">({inc.party.code})</span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">Direct / N/A</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs text-slate-600">
-                        {inc.store?.name || '—'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={inc.paymentMode === 'CASH' ? 'warning' : 'blue'}>
-                          {inc.paymentMode}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-slate-500 font-mono">
-                        {inc.referenceNo || '—'}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs font-bold text-emerald-600 text-right whitespace-nowrap">
-                        + ₹ {inc.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 w-7 p-0"
-                          onClick={() => setSelectedIncome(inc)}
-                        >
-                          <Eye className="w-3.5 h-3.5 text-slate-600" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
@@ -750,7 +748,7 @@ export const IncomePage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-2">
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"

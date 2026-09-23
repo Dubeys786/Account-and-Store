@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, Layers, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Layers, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
@@ -73,7 +74,7 @@ export const LoginPage: React.FC = () => {
           {/* Form */}
           <form onSubmit={handleSignIn} className="space-y-4">
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              <label htmlFor="email" className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                 EMAIL ADDRESS
               </label>
               <div className="relative rounded-xl border border-slate-700/80 bg-[#141f3d] focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-colors">
@@ -81,18 +82,21 @@ export const LoginPage: React.FC = () => {
                   <Mail className="w-4 h-4" />
                 </div>
                 <input
+                  id="email"
+                  name="email"
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none"
                   placeholder="name@company.com"
+                  autoComplete="email"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              <label htmlFor="password" className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                 PASSWORD
               </label>
               <div className="relative rounded-xl border border-slate-700/80 bg-[#141f3d] focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-colors">
@@ -100,20 +104,39 @@ export const LoginPage: React.FC = () => {
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
-                  type="password"
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none"
+                  className="w-full pl-10 pr-10 py-2.5 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none"
                   placeholder="••••••••••••"
+                  autoComplete="current-password"
                 />
+                <button
+                  id="password-toggle-btn"
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-200 transition-colors focus:outline-none cursor-pointer"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
               </div>
             </div>
 
             <button
+              id="sign-in-btn"
               type="submit"
               disabled={isSubmitting}
-              className="w-full mt-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold text-sm shadow-lg shadow-blue-600/30 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50"
+              className="w-full mt-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold text-sm shadow-lg shadow-blue-600/30 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50 cursor-pointer"
             >
               {isSubmitting ? 'Signing in...' : 'Sign In'}
             </button>

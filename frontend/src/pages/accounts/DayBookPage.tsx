@@ -168,7 +168,7 @@ export const DayBookPage: React.FC = () => {
             Chronological audit log of all financial transactions showing balanced debits, credits, parties, and creators
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <Button
             size="sm"
             variant="outline"
@@ -184,7 +184,7 @@ export const DayBookPage: React.FC = () => {
       </div>
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
           <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Transactions</span>
           <p className="text-xl font-bold text-slate-900 mt-1">{summary.totalTransactions}</p>
@@ -292,110 +292,108 @@ export const DayBookPage: React.FC = () => {
           <span className="text-xs font-semibold text-slate-500">{records.length} Journal Entries</span>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
+          <Table className="min-w-[900px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Transaction</TableHead>
+                <TableHead>Reference</TableHead>
+                <TableHead>Party</TableHead>
+                <TableHead>Debit</TableHead>
+                <TableHead>Credit</TableHead>
+                <TableHead className="text-right">Amount (₹)</TableHead>
+                <TableHead>Store</TableHead>
+                <TableHead>Created By</TableHead>
+                <TableHead className="text-center">View</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Transaction</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead>Party</TableHead>
-                  <TableHead>Debit</TableHead>
-                  <TableHead>Credit</TableHead>
-                  <TableHead className="text-right">Amount (₹)</TableHead>
-                  <TableHead>Store</TableHead>
-                  <TableHead>Created By</TableHead>
-                  <TableHead className="text-center">View</TableHead>
+                  <TableCell colSpan={10} className="text-center py-12 text-slate-400">
+                    <div className="flex items-center justify-center gap-2">
+                      <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
+                      <span>Loading Day Book transactions from database...</span>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={10} className="text-center py-12 text-slate-400">
-                      <div className="flex items-center justify-center gap-2">
-                        <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
-                        <span>Loading Day Book transactions from database...</span>
+              ) : records.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={10} className="text-center py-10 text-slate-400">
+                    No accounting transactions found for selected filters.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                records.map((row) => (
+                  <TableRow key={row.id} className="hover:bg-slate-50/80 transition-colors">
+                    {/* 1. Date */}
+                    <TableCell className="text-xs text-slate-600 whitespace-nowrap">
+                      {new Date(row.date).toLocaleDateString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </TableCell>
+
+                    {/* 2. Transaction */}
+                    <TableCell className="font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
+                      {row.transaction}
+                      <div className="text-[10px] text-slate-500 font-normal truncate max-w-[140px]">
+                        {row.narration}
                       </div>
                     </TableCell>
-                  </TableRow>
-                ) : records.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={10} className="text-center py-10 text-slate-400">
-                      No accounting transactions found for selected filters.
+
+                    {/* 3. Reference */}
+                    <TableCell className="text-xs">
+                      <Badge variant="neutral">{row.reference}</Badge>
+                    </TableCell>
+
+                    {/* 4. Party */}
+                    <TableCell className="text-xs font-medium text-slate-800">
+                      {row.party}
+                    </TableCell>
+
+                    {/* 5. Debit */}
+                    <TableCell className="text-xs text-rose-700 max-w-[200px]">
+                      <span className="line-clamp-2">{row.debit}</span>
+                    </TableCell>
+
+                    {/* 6. Credit */}
+                    <TableCell className="text-xs text-emerald-700 max-w-[200px]">
+                      <span className="line-clamp-2">{row.credit}</span>
+                    </TableCell>
+
+                    {/* 7. Amount */}
+                    <TableCell className="font-mono text-xs font-bold text-slate-900 text-right whitespace-nowrap">
+                      ₹ {row.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </TableCell>
+
+                    {/* 8. Store */}
+                    <TableCell className="text-xs text-slate-600 whitespace-nowrap">
+                      {row.store}
+                    </TableCell>
+
+                    {/* 9. Created By */}
+                    <TableCell className="text-xs text-slate-500 whitespace-nowrap">
+                      {row.createdBy}
+                    </TableCell>
+
+                    {/* Action */}
+                    <TableCell className="text-center">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0"
+                        onClick={() => setSelectedRecord(row)}
+                      >
+                        <Eye className="w-3.5 h-3.5 text-slate-600" />
+                      </Button>
                     </TableCell>
                   </TableRow>
-                ) : (
-                  records.map((row) => (
-                    <TableRow key={row.id} className="hover:bg-slate-50/80 transition-colors">
-                      {/* 1. Date */}
-                      <TableCell className="text-xs text-slate-600 whitespace-nowrap">
-                        {new Date(row.date).toLocaleDateString('en-IN', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </TableCell>
-
-                      {/* 2. Transaction */}
-                      <TableCell className="font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
-                        {row.transaction}
-                        <div className="text-[10px] text-slate-500 font-normal truncate max-w-[140px]">
-                          {row.narration}
-                        </div>
-                      </TableCell>
-
-                      {/* 3. Reference */}
-                      <TableCell className="text-xs">
-                        <Badge variant="neutral">{row.reference}</Badge>
-                      </TableCell>
-
-                      {/* 4. Party */}
-                      <TableCell className="text-xs font-medium text-slate-800">
-                        {row.party}
-                      </TableCell>
-
-                      {/* 5. Debit */}
-                      <TableCell className="text-xs text-rose-700 max-w-[200px]">
-                        <span className="line-clamp-2">{row.debit}</span>
-                      </TableCell>
-
-                      {/* 6. Credit */}
-                      <TableCell className="text-xs text-emerald-700 max-w-[200px]">
-                        <span className="line-clamp-2">{row.credit}</span>
-                      </TableCell>
-
-                      {/* 7. Amount */}
-                      <TableCell className="font-mono text-xs font-bold text-slate-900 text-right whitespace-nowrap">
-                        ₹ {row.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </TableCell>
-
-                      {/* 8. Store */}
-                      <TableCell className="text-xs text-slate-600 whitespace-nowrap">
-                        {row.store}
-                      </TableCell>
-
-                      {/* 9. Created By */}
-                      <TableCell className="text-xs text-slate-500 whitespace-nowrap">
-                        {row.createdBy}
-                      </TableCell>
-
-                      {/* Action */}
-                      <TableCell className="text-center">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 w-7 p-0"
-                          onClick={() => setSelectedRecord(row)}
-                        >
-                          <Eye className="w-3.5 h-3.5 text-slate-600" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 

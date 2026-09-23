@@ -11,6 +11,7 @@ export type AuditAction =
   | 'ADJUSTMENT'
   | 'VOID'
   | 'EXPORT'
+  | 'EMAIL_REPORT'
   | 'LOGIN'
   | 'LOGOUT'
   | 'SECURITY_EVENT';

@@ -26,7 +26,10 @@ app.use(
       if (!origin) return callback(null, true);
       if (
         env.CORS_ORIGIN.indexOf(origin) !== -1 ||
-        env.NODE_ENV === 'development'
+        env.NODE_ENV === 'development' ||
+        origin.endsWith('.vercel.app') ||
+        origin.includes('localhost') ||
+        origin.includes('127.0.0.1')
       ) {
         return callback(null, true);
       }
@@ -45,12 +48,25 @@ if (env.NODE_ENV !== 'test') {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API Routes
+// Canonical API Routes (v1)
 app.use('/api/v1/health', healthRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/store', storeRoutes);
 app.use('/api/v1/accounts', accountsRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+
+// Unversioned API Route Aliases (/api/...) for backward compatibility and flexible deployment
+app.use('/api/health', healthRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/store', storeRoutes);
+app.use('/api/accounts', accountsRoutes);
+app.use('/api/notifications', notificationRoutes);
+
+// Route alias for /api/reports/email
+app.use('/api/reports', (req, res, next) => {
+  req.url = `/reports${req.url}`;
+  accountsRoutes(req, res, next);
+});
 
 // Root fallback
 app.get('/', (_req, res) => {

@@ -311,7 +311,7 @@ export const ExpensesPage: React.FC = () => {
             Record direct and indirect operating expenditures, petty cash, electricity, rent, and freight with double-entry journal posting
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <Button
             size="sm"
             variant="outline"
@@ -346,7 +346,7 @@ export const ExpensesPage: React.FC = () => {
       )}
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
           <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Operating Expenses</span>
           <p className="text-xl font-bold text-rose-600 mt-1">
@@ -442,7 +442,7 @@ export const ExpensesPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-slate-500 font-medium">Date Range:</span>
               <input
                 type="date"
@@ -479,93 +479,93 @@ export const ExpensesPage: React.FC = () => {
           <span className="text-xs font-semibold text-slate-500">{expenses.length} Records Found</span>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
+          <Table className="min-w-[800px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Voucher #</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Party / Beneficiary</TableHead>
+                <TableHead>Store</TableHead>
+                <TableHead>Payment Mode</TableHead>
+                <TableHead>Reference</TableHead>
+                <TableHead className="text-right">Amount (₹)</TableHead>
+                <TableHead className="text-center">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
                 <TableRow>
-                  <TableHead>Voucher #</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Party / Beneficiary</TableHead>
-                  <TableHead>Store</TableHead>
-                  <TableHead>Payment Mode</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead className="text-right">Amount (₹)</TableHead>
-                  <TableHead className="text-center">Action</TableHead>
+                  <TableCell colSpan={9} className="text-center py-12 text-slate-400">
+                    <div className="flex items-center justify-center gap-2">
+                      <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
+                      <span>Loading operating expenses from database...</span>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-12 text-slate-400">
-                      <div className="flex items-center justify-center gap-2">
-                        <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
-                        <span>Loading operating expenses from database...</span>
-                      </div>
+              ) : expenses.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-10 text-slate-400">
+                    No operating expenses match current criteria.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                expenses.map((exp) => (
+                  <TableRow key={exp.id} className="hover:bg-slate-50/80 transition-colors">
+                    <TableCell className="font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
+                      {exp.expenseNumber}
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-600 whitespace-nowrap">
+                      {new Date(exp.expenseDate).toLocaleDateString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </TableCell>
+                    <TableCell className="text-xs font-medium text-slate-700">
+                      <Badge variant="neutral">{exp.category}</Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-800 font-medium">
+                      {exp.party ? (
+                        <div>
+                          <span>{exp.party.name}</span>
+                          <span className="text-[10px] text-slate-400 block font-mono">
+                            {exp.party.code}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 italic">Direct Expense</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-600 whitespace-nowrap">
+                      {exp.store?.name || '—'}
+                    </TableCell>
+                    <TableCell className="text-xs whitespace-nowrap">
+                      <Badge variant={exp.paymentMode === 'CASH' ? 'success' : 'blue'}>
+                        {exp.paymentMode}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-slate-500 whitespace-nowrap">
+                      {exp.referenceNo || '—'}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs font-bold text-rose-600 text-right whitespace-nowrap">
+                      ₹ {exp.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0"
+                        onClick={() => setSelectedExpense(exp)}
+                      >
+                        <Eye className="w-3.5 h-3.5 text-slate-600" />
+                      </Button>
                     </TableCell>
                   </TableRow>
-                ) : expenses.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-10 text-slate-400">
-                      No operating expenses match current criteria.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  expenses.map((exp) => (
-                    <TableRow key={exp.id} className="hover:bg-slate-50/80 transition-colors">
-                      <TableCell className="font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
-                        {exp.expenseNumber}
-                      </TableCell>
-                      <TableCell className="text-xs text-slate-600 whitespace-nowrap">
-                        {new Date(exp.expenseDate).toLocaleDateString('en-IN', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="neutral">{exp.category}</Badge>
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {exp.party ? (
-                          <div className="font-medium text-slate-800">
-                            {exp.party.name}{' '}
-                            <span className="text-[10px] text-slate-500 font-normal">({exp.party.code})</span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">Direct / N/A</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs text-slate-600">
-                        {exp.store?.name || '—'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={exp.paymentMode === 'CASH' ? 'warning' : 'blue'}>
-                          {exp.paymentMode}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-slate-500 font-mono">
-                        {exp.referenceNo || '—'}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs font-bold text-rose-600 text-right whitespace-nowrap">
-                        ₹ {exp.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 w-7 p-0"
-                          onClick={() => setSelectedExpense(exp)}
-                        >
-                          <Eye className="w-3.5 h-3.5 text-slate-600" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
@@ -757,7 +757,7 @@ export const ExpensesPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-2">
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"

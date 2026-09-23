@@ -364,14 +364,14 @@ export const PartyMasterPage: React.FC = () => {
 
       {/* Professional Party Master Table */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between py-3">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-3">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Party Directory</span>
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
               {meta.total} Records
             </span>
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
+          <div className="flex items-center gap-2 text-xs text-slate-500 self-end sm:self-auto">
             <span>Per page:</span>
             <select
               value={meta.limit}
@@ -388,8 +388,7 @@ export const PartyMasterPage: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
+          <Table className="min-w-[720px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Party Code</TableHead>
@@ -545,8 +544,6 @@ export const PartyMasterPage: React.FC = () => {
                 )}
               </TableBody>
             </Table>
-          </div>
-
           {/* Pagination Footer */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-3 border-t border-slate-200 bg-slate-50/50">
             <span className="text-xs text-slate-500">

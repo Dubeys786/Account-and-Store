@@ -191,7 +191,7 @@ export const AccountsDashboardPage: React.FC = () => {
             Real-time financial positions, trade liabilities, cash flows, and operating ledger metrics
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             variant="outline"
@@ -222,7 +222,7 @@ export const AccountsDashboardPage: React.FC = () => {
           <span className="text-[11px] text-slate-400">All figures derived live from database</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
           {/* 1. Total Payables */}
           <StatsCard
             title="Total Payables"
@@ -327,23 +327,23 @@ export const AccountsDashboardPage: React.FC = () => {
 
       {/* 7 INTERACTIVE CHARTS: Purchases, Payments, Receipts, Payables, Receivables, Expenses, Income */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-blue-600" />
+            <BarChart3 className="w-4 h-4 text-blue-600 shrink-0" />
             <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
               Financial Performance Charts (Live Database Data)
             </span>
           </div>
-          <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-xs">
+          <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-xs overflow-x-auto max-w-full">
             <button
               onClick={() => setActiveChartTab('OPERATIONS')}
-              className={`px-2.5 py-1 font-semibold rounded-md transition-all ${activeChartTab === 'OPERATIONS' ? 'bg-white shadow-2xs text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`px-2.5 py-1 font-semibold rounded-md transition-all whitespace-nowrap ${activeChartTab === 'OPERATIONS' ? 'bg-white shadow-2xs text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
             >
               Purchases vs Expenses vs Income
             </button>
             <button
               onClick={() => setActiveChartTab('CASH_FLOW')}
-              className={`px-2.5 py-1 font-semibold rounded-md transition-all ${activeChartTab === 'CASH_FLOW' ? 'bg-white shadow-2xs text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`px-2.5 py-1 font-semibold rounded-md transition-all whitespace-nowrap ${activeChartTab === 'CASH_FLOW' ? 'bg-white shadow-2xs text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
             >
               Cash Inflows vs Outflows
             </button>
@@ -354,7 +354,7 @@ export const AccountsDashboardPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main 6-Month Timeseries Bar Chart */}
           <Card className="lg:col-span-2">
-            <CardHeader className="py-3 px-4 border-b border-slate-100 flex flex-row items-center justify-between">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <CardTitle className="text-sm">
                   {activeChartTab === 'OPERATIONS' ? 'Monthly Operational Volume (Past 6 Months)' : 'Cash Inflows vs Payments (Past 6 Months)'}
@@ -363,7 +363,7 @@ export const AccountsDashboardPage: React.FC = () => {
                   {activeChartTab === 'OPERATIONS' ? 'Direct database aggregations of Purchases, Operating Expenses, and Income' : 'Direct database aggregations of Receipts collected vs Payments disbursed'}
                 </p>
               </div>
-              <div className="flex items-center gap-3 text-[11px] font-semibold">
+              <div className="flex flex-wrap items-center gap-2.5 text-[11px] font-semibold">
                 {activeChartTab === 'OPERATIONS' ? (
                   <>
                     <span className="flex items-center gap-1 text-blue-600">
@@ -400,7 +400,8 @@ export const AccountsDashboardPage: React.FC = () => {
                   </p>
                 </div>
               ) : (
-                <div className="h-64 flex items-end justify-between gap-4 pt-4 pb-2 px-2">
+                <div className="overflow-x-auto min-w-0">
+                  <div className="h-64 min-w-[360px] flex items-end justify-between gap-2 sm:gap-4 pt-4 pb-2 px-2">
                   {analytics?.monthlySeries.map((month) => {
                     const pHeight = month.purchases > 0 ? Math.max(4, Math.round((month.purchases / maxMonthlyVal) * 200)) : 0;
                     const eHeight = month.expenses > 0 ? Math.max(4, Math.round((month.expenses / maxMonthlyVal) * 200)) : 0;
@@ -468,6 +469,7 @@ export const AccountsDashboardPage: React.FC = () => {
                       </div>
                     );
                   })}
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -669,8 +671,7 @@ export const AccountsDashboardPage: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
+          <Table className="min-w-[700px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
@@ -752,7 +753,6 @@ export const AccountsDashboardPage: React.FC = () => {
                 )}
               </TableBody>
             </Table>
-          </div>
         </CardContent>
       </Card>
     </div>

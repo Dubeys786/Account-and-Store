@@ -34,6 +34,7 @@ export interface ReportFilterOptions {
   search?: string;
   page?: number;
   limit?: number;
+  unlimited?: boolean;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
@@ -99,8 +100,11 @@ export class ReportsService {
     this.validateAccess(user, options.storeId);
 
     const reportType = (options.reportType || 'PURCHASE_REPORT').toUpperCase() as ReportType;
-    const page = Math.max(1, Number(options.page || 1));
-    const limit = Math.max(1, Math.min(200, Number(options.limit || 50)));
+    const isUnlimited = options.unlimited === true || String(options.unlimited) === 'true';
+    const page = isUnlimited ? 1 : Math.max(1, Number(options.page || 1));
+    const maxLimit = isUnlimited ? 10000 : 200;
+    const defaultLimit = isUnlimited ? 10000 : 50;
+    const limit = Math.max(1, Math.min(maxLimit, Number(options.limit || defaultLimit)));
     const skip = (page - 1) * limit;
 
     const startDate = options.startDate ? new Date(options.startDate) : null;

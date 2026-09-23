@@ -22,6 +22,8 @@ import { AccountsSecurityError } from './accounts.guard';
 import { preventParameterTampering } from '../../middleware/security.middleware';
 import { AuditService } from '../audit/audit.service';
 import { NotificationService } from '../notification/notification.service';
+import { EmailService } from '../../services/email.service';
+import { ReportAttachmentService } from './reports/report-attachment.service';
 
 const router = Router();
 
@@ -977,6 +979,201 @@ router.get('/reports/export', async (req: Request, res: Response) => {
       res.status(error.statusCode).json({ success: false, message: error.message });
       return;
     }
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.post('/reports/email', async (req: Request, res: Response) => {
+  const user = req.user!;
+  const { to, cc, bcc, subject, message, reportType, format, filters = {} } = req.body;
+
+  try {
+    // 1. Validate required fields
+    if (!to || (typeof to === 'string' && !to.trim()) || (Array.isArray(to) && to.length === 0)) {
+      res.status(400).json({ success: false, message: 'Recipient "to" email address is required.' });
+      return;
+    }
+
+    if (!reportType) {
+      res.status(400).json({ success: false, message: 'Report type is required.' });
+      return;
+    }
+
+    const validFormats = ['pdf', 'excel', 'xlsx', 'xls', 'csv'];
+    const chosenFormat = (format || 'pdf').toLowerCase();
+    if (!validFormats.includes(chosenFormat)) {
+      res.status(400).json({
+        success: false,
+        message: `Invalid format '${format}'. Supported formats are: PDF, Excel, CSV.`,
+      });
+      return;
+    }
+
+    // 2. Validate email syntax and prevent header injection
+    let parsedTo: string[];
+    let parsedCc: string[] = [];
+    let parsedBcc: string[] = [];
+
+    try {
+      parsedTo = EmailService.parseEmailList(to);
+      parsedCc = EmailService.parseEmailList(cc);
+      parsedBcc = EmailService.parseEmailList(bcc);
+    } catch (parseErr: any) {
+      res.status(400).json({ success: false, message: parseErr.message });
+      return;
+    }
+
+    if (parsedTo.length === 0) {
+      res.status(400).json({ success: false, message: 'At least one valid "to" email address is required.' });
+      return;
+    }
+
+    if (parsedTo.length + parsedCc.length + parsedBcc.length > 10) {
+      res.status(400).json({
+        success: false,
+        message: 'Recipient limit exceeded. Maximum 10 recipients allowed per email request.',
+      });
+      return;
+    }
+
+    // 3. Security: Check store tenancy
+    if (filters.storeId && filters.storeId !== 'ALL' && user.role !== UserRole.ADMIN) {
+      if (!user.storeIds || !user.storeIds.includes(filters.storeId)) {
+        res.status(403).json({
+          success: false,
+          message: `Forbidden: You do not have permission to view or email reports for store '${filters.storeId}'.`,
+        });
+        return;
+      }
+    }
+
+    // 4. Generate report with unlimited records (full filtered dataset)
+    const reportOptions = {
+      ...filters,
+      reportType,
+      unlimited: true,
+    };
+
+    const reportResult = await ReportsService.generateReport(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      reportOptions as any
+    );
+
+    // 5. Zero-records check
+    if (!reportResult.records || reportResult.records.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'No records found for the selected filters. Cannot send an empty report.',
+      });
+      return;
+    }
+
+    // 6. Generate binary attachment
+    const attachment = await ReportAttachmentService.generateAttachment(reportResult, chosenFormat);
+
+    // 7. Format metadata for email summary
+    let dateRangeText = 'All Dates';
+    if (filters.startDate && filters.endDate) {
+      dateRangeText = `${filters.startDate} to ${filters.endDate}`;
+    } else if (filters.startDate) {
+      dateRangeText = `From ${filters.startDate}`;
+    } else if (filters.endDate) {
+      dateRangeText = `Up to ${filters.endDate}`;
+    }
+
+    const storeName = filters.storeName || (filters.storeId && filters.storeId !== 'ALL' ? filters.storeId : 'All Authorized Stores');
+    const partyName = filters.partyName || (filters.partyId && filters.partyId !== 'ALL' ? filters.partyId : 'All Parties');
+
+    // 8. Dispatch Email via SMTP
+    const emailResult = await EmailService.sendReportEmail({
+      to: parsedTo,
+      cc: parsedCc.length > 0 ? parsedCc : undefined,
+      bcc: parsedBcc.length > 0 ? parsedBcc : undefined,
+      subject,
+      message,
+      reportTitle: reportResult.reportTitle,
+      reportMetadata: {
+        dateRangeText,
+        storeName,
+        partyName,
+        recordCount: reportResult.records.length,
+      },
+      attachment,
+    });
+
+    // 9. Record Audit Trail
+    await AuditService.record({
+      userId: user.id,
+      action: 'EMAIL_REPORT',
+      entity: 'Report',
+      entityId: String(reportType),
+      newValues: {
+        reportType,
+        recipients: emailResult.recipients,
+        format: chosenFormat.toUpperCase(),
+        recordCount: reportResult.records.length,
+        filters,
+        status: 'SUCCESS',
+        timestamp: new Date().toISOString(),
+      },
+      ipAddress: req.ip || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({
+      success: true,
+      message: `Report emailed successfully to ${parsedTo.join(', ')}`,
+      data: {
+        reportType,
+        reportTitle: reportResult.reportTitle,
+        format: chosenFormat.toUpperCase(),
+        recordCount: reportResult.records.length,
+        recipients: emailResult.recipients,
+        previewUrl: emailResult.previewUrl || undefined,
+      },
+    });
+  } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
+
+    // Record failed audit log
+    await AuditService.record({
+      userId: user?.id,
+      action: 'EMAIL_REPORT',
+      entity: 'Report',
+      entityId: String(reportType || 'UNKNOWN'),
+      newValues: {
+        reportType,
+        status: 'FAILED',
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      },
+      ipAddress: req.ip || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'],
+    });
+
+    const isBadRequest = error.message?.includes('Invalid') || error.message?.includes('required') || error.message?.includes('injection');
+    res.status(isBadRequest ? 400 : 500).json({
+      success: false,
+      message: error.message || 'Unable to send the report. Please try again.',
+    });
+  }
+});
+
+router.get('/audit-logs', async (req: Request, res: Response) => {
+  try {
+    const action = req.query.action as string;
+    const where: any = {};
+    if (action) where.action = action;
+    const logs = await prisma.auditLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+    res.json({ success: true, data: logs });
+  } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
 });

@@ -23,12 +23,14 @@ import {
   TrendingDown,
   TrendingUp,
   BookOpen,
+  Mail,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/common/Table';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import apiRequest from '../../services/api';
+import { EmailReportModal } from './components/EmailReportModal';
 
 export type ReportType =
   | 'PARTY_LEDGER'
@@ -128,6 +130,7 @@ export const AccountsReportsPage: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 
   // Dropdown Metadata
   const [stores, setStores] = useState<StoreItem[]>([]);
@@ -318,6 +321,58 @@ export const AccountsReportsPage: React.FC = () => {
 
   const activeMeta = REPORT_CATALOG.find((r) => r.id === activeReport);
 
+  const selectedStoreObj = stores.find((s) => s.id === selectedStore);
+  const storeLabel =
+    selectedStore === 'ALL'
+      ? 'All Authorized Stores'
+      : selectedStoreObj
+      ? `${selectedStoreObj.name} (${selectedStoreObj.code})`
+      : selectedStore;
+
+  const selectedPartyObj = parties.find((p) => p.id === selectedParty);
+  const partyLabel =
+    selectedParty === 'ALL'
+      ? 'All Parties'
+      : selectedPartyObj
+      ? `${selectedPartyObj.name} (${selectedPartyObj.code})`
+      : selectedParty;
+
+  let dateRangeLabel = 'All Dates';
+  if (startDate && endDate) {
+    dateRangeLabel = `${startDate} to ${endDate}`;
+  } else if (startDate) {
+    dateRangeLabel = `From ${startDate}`;
+  } else if (endDate) {
+    dateRangeLabel = `Up to ${endDate}`;
+  }
+
+  const currentFiltersObj = useMemo(
+    () => ({
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+      storeId: selectedStore !== 'ALL' ? selectedStore : undefined,
+      partyId: selectedParty !== 'ALL' ? selectedParty : undefined,
+      transactionType: transactionType !== 'ALL' ? transactionType : undefined,
+      paymentMethod: paymentMethod !== 'ALL' ? paymentMethod : undefined,
+      status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
+      poNumber: poNumber.trim() || undefined,
+      invoiceNumber: invoiceNumber.trim() || undefined,
+      search: search.trim() || undefined,
+    }),
+    [
+      startDate,
+      endDate,
+      selectedStore,
+      selectedParty,
+      transactionType,
+      paymentMethod,
+      selectedStatus,
+      poNumber,
+      invoiceNumber,
+      search,
+    ]
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -333,7 +388,7 @@ export const AccountsReportsPage: React.FC = () => {
             Audit-ready financial statements, purchase logs, vendor payables, cash/bank books, and multi-store accounting
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />} onClick={fetchReportData}>
             Refresh
           </Button>
@@ -345,6 +400,9 @@ export const AccountsReportsPage: React.FC = () => {
           </Button>
           <Button size="sm" variant="primary" icon={<FileSpreadsheet className="w-3.5 h-3.5" />} onClick={handleExportExcel}>
             Excel
+          </Button>
+          <Button size="sm" variant="outline" icon={<Mail className="w-3.5 h-3.5 text-indigo-600" />} onClick={() => setIsEmailModalOpen(true)}>
+            Email
           </Button>
         </div>
       </div>
@@ -594,95 +652,93 @@ export const AccountsReportsPage: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
+          <Table className="min-w-[850px]">
+            <TableHeader>
+              <TableRow>
+                {reportData?.columns.map((col) => (
+                  <TableHead
+                    key={col.key}
+                    className={`cursor-pointer hover:bg-slate-100 transition-colors select-none text-${col.align || 'left'}`}
+                    onClick={() => handleSort(col.key)}
+                  >
+                    <div className={`flex items-center gap-1.5 ${col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : 'justify-start'}`}>
+                      <span>{col.label}</span>
+                      {sortKey === col.key ? (
+                        sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-slate-300" />
+                      )}
+                    </div>
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
                 <TableRow>
-                  {reportData?.columns.map((col) => (
-                    <TableHead
-                      key={col.key}
-                      className={`cursor-pointer hover:bg-slate-100 transition-colors select-none text-${col.align || 'left'}`}
-                      onClick={() => handleSort(col.key)}
-                    >
-                      <div className={`flex items-center gap-1.5 ${col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : 'justify-start'}`}>
-                        <span>{col.label}</span>
-                        {sortKey === col.key ? (
-                          sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />
-                        ) : (
-                          <ArrowUpDown className="w-3 h-3 text-slate-300" />
-                        )}
-                      </div>
-                    </TableHead>
-                  ))}
+                  <TableCell colSpan={reportData?.columns.length || 8} className="text-center py-12 text-slate-400">
+                    <div className="flex items-center justify-center gap-2">
+                      <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
+                      <span>Generating report from database records...</span>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={reportData?.columns.length || 8} className="text-center py-12 text-slate-400">
-                      <div className="flex items-center justify-center gap-2">
-                        <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
-                        <span>Generating report from database records...</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : !sortedRecords || sortedRecords.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={reportData?.columns.length || 8} className="text-center py-10 text-slate-400">
-                      No records found matching the specified report filters.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  sortedRecords.map((row, idx) => (
-                    <TableRow key={row.id || idx} className="hover:bg-slate-50/80 transition-colors">
-                      {reportData?.columns.map((col) => {
-                        const val = row[col.key];
+              ) : !sortedRecords || sortedRecords.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={reportData?.columns.length || 8} className="text-center py-10 text-slate-400">
+                    No records found matching the specified report filters.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                sortedRecords.map((row, idx) => (
+                  <TableRow key={row.id || idx} className="hover:bg-slate-50/80 transition-colors">
+                    {reportData?.columns.map((col) => {
+                      const val = row[col.key];
 
-                        if (col.type === 'currency') {
-                          const num = typeof val === 'number' ? val : parseFloat(val || '0');
-                          return (
-                            <TableCell key={col.key} className="font-mono text-xs font-semibold text-slate-900 text-right whitespace-nowrap">
-                              {isNaN(num) ? '—' : `₹ ${num.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
-                            </TableCell>
-                          );
-                        }
-
-                        if (col.type === 'date') {
-                          return (
-                            <TableCell key={col.key} className="text-xs text-slate-600 whitespace-nowrap">
-                              {val ? new Date(val).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                            </TableCell>
-                          );
-                        }
-
-                        if (col.type === 'badge') {
-                          const str = String(val || '—');
-                          const isPaid = str.includes('PAID') && !str.includes('PARTIAL') && !str.includes('UN');
-                          const isUnpaid = str.includes('UNPAID');
-                          const variant = isPaid ? 'success' : isUnpaid ? 'error' : 'blue';
-                          return (
-                            <TableCell key={col.key} className="text-center whitespace-nowrap">
-                              <Badge variant={variant as any}>{str}</Badge>
-                            </TableCell>
-                          );
-                        }
-
+                      if (col.type === 'currency') {
+                        const num = typeof val === 'number' ? val : parseFloat(val || '0');
                         return (
-                          <TableCell key={col.key} className={`text-xs text-slate-700 text-${col.align || 'left'}`}>
-                            {val !== null && val !== undefined ? String(val) : '—'}
+                          <TableCell key={col.key} className="font-mono text-xs font-semibold text-slate-900 text-right whitespace-nowrap">
+                            {isNaN(num) ? '—' : `₹ ${num.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
                           </TableCell>
                         );
-                      })}
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                      }
+
+                      if (col.type === 'date') {
+                        return (
+                          <TableCell key={col.key} className="text-xs text-slate-600 whitespace-nowrap">
+                            {val ? new Date(val).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                          </TableCell>
+                        );
+                      }
+
+                      if (col.type === 'badge') {
+                        const str = String(val || '—');
+                        const isPaid = str.includes('PAID') && !str.includes('PARTIAL') && !str.includes('UN');
+                        const isUnpaid = str.includes('UNPAID');
+                        const variant = isPaid ? 'success' : isUnpaid ? 'error' : 'blue';
+                        return (
+                          <TableCell key={col.key} className="text-center whitespace-nowrap">
+                            <Badge variant={variant as any}>{str}</Badge>
+                          </TableCell>
+                        );
+                      }
+
+                      return (
+                        <TableCell key={col.key} className={`text-xs text-slate-700 text-${col.align || 'left'}`}>
+                          {val !== null && val !== undefined ? String(val) : '—'}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
 
           {/* Pagination Controls */}
           {reportData?.pagination && reportData.pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 print:hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-slate-100 print:hidden">
               <span className="text-xs text-slate-500">
                 Page {reportData.pagination.page} of {reportData.pagination.totalPages} ({reportData.pagination.total} total rows)
               </span>
@@ -710,6 +766,21 @@ export const AccountsReportsPage: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Email Report Modal */}
+      <EmailReportModal
+        isOpen={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
+        reportType={activeReport}
+        reportTitle={reportData?.reportTitle || activeMeta?.title || 'Financial Report'}
+        currentFilters={currentFiltersObj}
+        summaryInfo={{
+          dateRangeText: dateRangeLabel,
+          storeName: storeLabel,
+          partyName: partyLabel,
+          recordCount: reportData?.records?.length || 0,
+        }}
+      />
     </div>
   );
 };

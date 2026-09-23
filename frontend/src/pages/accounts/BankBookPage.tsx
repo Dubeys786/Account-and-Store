@@ -162,7 +162,7 @@ export const BankBookPage: React.FC = () => {
             Operating bank account ledger (Account 1020), deposits, NEFT/RTGS, UPI settlements, and withdrawals with running balance
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <Button
             size="sm"
             variant="outline"
@@ -179,7 +179,7 @@ export const BankBookPage: React.FC = () => {
 
       {/* 4 Required KPI Summary Cards:
           Opening Bank Balance, Bank Receipts, Bank Payments, Closing Bank Balance */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* 1. Opening Bank Balance */}
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
           <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Opening Bank Balance</span>
@@ -240,7 +240,7 @@ export const BankBookPage: React.FC = () => {
               </div>
 
               {/* Date Filter */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Calendar className="w-4 h-4 text-slate-400" />
                 <span className="text-xs text-slate-500 font-medium">From:</span>
                 <input
@@ -280,77 +280,75 @@ export const BankBookPage: React.FC = () => {
           <span className="text-xs font-semibold text-slate-500">{entries.length} Ledger Entries</span>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
+          <Table className="min-w-[800px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Voucher / Txn #</TableHead>
+                <TableHead>Particulars (Contra)</TableHead>
+                <TableHead>Party Involved</TableHead>
+                <TableHead>Store</TableHead>
+                <TableHead className="text-right">Deposits (Dr ₹)</TableHead>
+                <TableHead className="text-right">Withdrawals (Cr ₹)</TableHead>
+                <TableHead className="text-right font-bold">Running Balance (₹)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Voucher / Txn #</TableHead>
-                  <TableHead>Particulars (Contra)</TableHead>
-                  <TableHead>Party Involved</TableHead>
-                  <TableHead>Store</TableHead>
-                  <TableHead className="text-right">Deposits (Dr ₹)</TableHead>
-                  <TableHead className="text-right">Withdrawals (Cr ₹)</TableHead>
-                  <TableHead className="text-right font-bold">Running Balance (₹)</TableHead>
+                  <TableCell colSpan={8} className="text-center py-12 text-slate-400">
+                    <div className="flex items-center justify-center gap-2">
+                      <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
+                      <span>Calculating Bank Book statement from database...</span>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12 text-slate-400">
-                      <div className="flex items-center justify-center gap-2">
-                        <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
-                        <span>Calculating Bank Book statement from database...</span>
+              ) : entries.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-10 text-slate-400">
+                    No bank transactions recorded for selected date and store.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                entries.map((entry) => (
+                  <TableRow key={entry.id} className="hover:bg-slate-50/80 transition-colors">
+                    <TableCell className="text-xs text-slate-600 whitespace-nowrap">
+                      {new Date(entry.date).toLocaleDateString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
+                      {entry.voucherNumber}
+                      <div className="text-[10px] text-slate-400 font-normal">{entry.referenceType}</div>
+                    </TableCell>
+                    <TableCell className="text-xs font-medium text-slate-800">
+                      {entry.particulars}
+                      <div className="text-[10px] text-slate-500 truncate max-w-[200px] font-normal">
+                        {entry.narration}
                       </div>
                     </TableCell>
-                  </TableRow>
-                ) : entries.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-10 text-slate-400">
-                      No bank transactions recorded for selected date and store.
+                    <TableCell className="text-xs text-slate-700">
+                      {entry.party}
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-600 whitespace-nowrap">
+                      {entry.store}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs font-bold text-emerald-600 text-right whitespace-nowrap">
+                      {entry.receipt > 0 ? `₹ ${entry.receipt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs font-bold text-rose-600 text-right whitespace-nowrap">
+                      {entry.payment > 0 ? `₹ ${entry.payment.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs font-bold text-blue-700 text-right whitespace-nowrap bg-blue-50/30">
+                      ₹ {entry.runningBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </TableCell>
                   </TableRow>
-                ) : (
-                  entries.map((entry) => (
-                    <TableRow key={entry.id} className="hover:bg-slate-50/80 transition-colors">
-                      <TableCell className="text-xs text-slate-600 whitespace-nowrap">
-                        {new Date(entry.date).toLocaleDateString('en-IN', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
-                        {entry.voucherNumber}
-                        <div className="text-[10px] text-slate-400 font-normal">{entry.referenceType}</div>
-                      </TableCell>
-                      <TableCell className="text-xs font-medium text-slate-800">
-                        {entry.particulars}
-                        <div className="text-[10px] text-slate-500 truncate max-w-[200px] font-normal">
-                          {entry.narration}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs text-slate-700">
-                        {entry.party}
-                      </TableCell>
-                      <TableCell className="text-xs text-slate-600 whitespace-nowrap">
-                        {entry.store}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs font-bold text-emerald-600 text-right whitespace-nowrap">
-                        {entry.receipt > 0 ? `₹ ${entry.receipt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs font-bold text-rose-600 text-right whitespace-nowrap">
-                        {entry.payment > 0 ? `₹ ${entry.payment.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs font-bold text-blue-700 text-right whitespace-nowrap bg-blue-50/30">
-                        ₹ {entry.runningBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

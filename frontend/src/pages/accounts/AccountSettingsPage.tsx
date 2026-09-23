@@ -30,20 +30,20 @@ export const AccountSettingsPage: React.FC = () => {
             </div>
             <Badge variant="success">Active</Badge>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between py-2 border-b border-slate-100 text-xs">
+          <CardContent className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:justify-between py-2 border-b border-slate-100 text-xs gap-1 sm:gap-2">
               <span className="text-slate-500 font-medium">Financial Year</span>
               <span className="font-bold text-slate-800">2026-2027 (01 Apr 2026 - 31 Mar 2027)</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-slate-100 text-xs">
+            <div className="flex flex-col sm:flex-row sm:justify-between py-2 border-b border-slate-100 text-xs gap-1 sm:gap-2">
               <span className="text-slate-500 font-medium">Base Currency</span>
               <span className="font-bold text-slate-800">Indian Rupee (INR - ₹)</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-slate-100 text-xs">
+            <div className="flex flex-col sm:flex-row sm:justify-between py-2 border-b border-slate-100 text-xs gap-1 sm:gap-2">
               <span className="text-slate-500 font-medium">GST Composition / Regular</span>
               <span className="font-bold text-emerald-700">Regular GST Registered</span>
             </div>
-            <div className="flex justify-between py-2 text-xs">
+            <div className="flex flex-col sm:flex-row sm:justify-between py-2 text-xs gap-1 sm:gap-2">
               <span className="text-slate-500 font-medium">Accounting Method</span>
               <span className="font-bold text-slate-800">Accrual Basis (Double Entry)</span>
             </div>

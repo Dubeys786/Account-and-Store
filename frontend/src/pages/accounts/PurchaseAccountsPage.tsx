@@ -447,7 +447,7 @@ export const PurchaseAccountsPage: React.FC = () => {
               : 'Unified enterprise purchase accounting supporting both PO-backed workflows and direct vendor purchases with automated double-entry vouchers.'}
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             variant="outline"
@@ -634,9 +634,9 @@ export const PurchaseAccountsPage: React.FC = () => {
         </div>
 
         {/* Filter Controls Bar */}
-        <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col md:flex-row md:items-center gap-3">
+        <div className="p-3 sm:p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col md:flex-row md:items-center gap-2.5 sm:gap-3">
           {/* Search Box */}
-          <div className="relative flex-1 min-w-[240px]">
+          <div className="relative w-full md:flex-1 md:min-w-[200px]">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -647,59 +647,61 @@ export const PurchaseAccountsPage: React.FC = () => {
             />
           </div>
 
-          {/* Supplier Filter */}
-          <div className="w-full sm:w-48">
-            <select
-              value={selectedSupplier}
-              onChange={(e) => setSelectedSupplier(e.target.value)}
-              className="w-full py-1.5 px-2.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Suppliers</option>
-              {suppliersList.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full md:w-auto">
+            {/* Supplier Filter */}
+            <div className="w-full sm:w-44">
+              <select
+                value={selectedSupplier}
+                onChange={(e) => setSelectedSupplier(e.target.value)}
+                className="w-full py-1.5 px-2.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Suppliers</option>
+                {suppliersList.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Store Filter */}
-          <div className="w-full sm:w-44">
-            <select
-              value={selectedStore}
-              onChange={(e) => setSelectedStore(e.target.value)}
-              className="w-full py-1.5 px-2.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Stores</option>
-              {storesList.map((st) => (
-                <option key={st.id} value={st.id}>
-                  {st.name}
-                </option>
-              ))}
-            </select>
-          </div>
+            {/* Store Filter */}
+            <div className="w-full sm:w-40">
+              <select
+                value={selectedStore}
+                onChange={(e) => setSelectedStore(e.target.value)}
+                className="w-full py-1.5 px-2.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Stores</option>
+                {storesList.map((st) => (
+                  <option key={st.id} value={st.id}>
+                    {st.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Payment Status Filter */}
-          <div className="w-full sm:w-36">
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full py-1.5 px-2.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="ALL">All Status</option>
-              <option value="UNPAID">UNPAID</option>
-              <option value="PARTIALLY_PAID">PARTIALLY PAID</option>
-              <option value="PAID">PAID</option>
-            </select>
+            {/* Payment Status Filter */}
+            <div className="w-full sm:w-36">
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="w-full py-1.5 px-2.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="ALL">All Status</option>
+                <option value="UNPAID">UNPAID</option>
+                <option value="PARTIALLY_PAID">PARTIALLY PAID</option>
+                <option value="PAID">PAID</option>
+              </select>
+            </div>
           </div>
 
           {/* Date Range Inputs */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="py-1.5 px-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 sm:flex-initial py-1.5 px-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               title="Start Date"
             />
             <span className="text-slate-400 text-xs">to</span>
@@ -707,7 +709,7 @@ export const PurchaseAccountsPage: React.FC = () => {
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="py-1.5 px-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 sm:flex-initial py-1.5 px-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               title="End Date"
             />
           </div>
@@ -723,7 +725,7 @@ export const PurchaseAccountsPage: React.FC = () => {
                 setStartDate('');
                 setEndDate('');
               }}
-              className="text-xs text-blue-600 hover:text-blue-800 font-semibold underline shrink-0 px-1"
+              className="text-xs text-rose-600 hover:text-rose-800 font-semibold px-2 py-1.5 whitespace-nowrap self-end md:self-auto"
             >
               Clear
             </button>
@@ -732,7 +734,7 @@ export const PurchaseAccountsPage: React.FC = () => {
 
         {/* Purchase Invoices Table */}
         <CardContent className="p-0">
-          <Table>
+          <Table className="min-w-[850px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
@@ -917,7 +919,7 @@ export const PurchaseAccountsPage: React.FC = () => {
           </div>
 
           <div className="border border-slate-200 rounded-xl overflow-hidden max-h-[50vh] overflow-y-auto">
-            <Table>
+            <Table className="min-w-[650px]">
               <TableHeader>
                 <TableRow className="bg-slate-50 text-[11px]">
                   <TableHead>PO Number</TableHead>
@@ -1128,7 +1130,7 @@ export const PurchaseAccountsPage: React.FC = () => {
                 </span>
               </div>
               <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <Table>
+                <Table className="min-w-[650px]">
                   <TableHeader>
                     <TableRow className="bg-slate-50 text-[11px]">
                       <TableHead>Item</TableHead>
