@@ -91,7 +91,7 @@ export class PartyService {
     isAdmin: boolean = false
   ): Promise<PaginatedPartiesResult> {
     const page = Math.max(1, filters.page || 1);
-    const limit = Math.max(1, Math.min(100, filters.limit || 20));
+    const limit = Math.max(1, Math.min(1000, filters.limit || 20));
     const skip = (page - 1) * limit;
 
     const andConditions: Prisma.PartyWhereInput[] = [];
@@ -113,7 +113,16 @@ export class PartyService {
 
     // Type filter
     if (filters.type && filters.type !== 'ALL') {
-      andConditions.push({ type: filters.type as PartyType });
+      if (typeof filters.type === 'string' && filters.type.includes(',')) {
+        const rawTypes = filters.type.split(',').map((t) => t.trim() as PartyType);
+        andConditions.push({ type: { in: rawTypes } });
+      } else if (filters.type === 'CUSTOMER') {
+        andConditions.push({ type: { in: [PartyType.CUSTOMER, PartyType.BOTH] } });
+      } else if (filters.type === 'SUPPLIER') {
+        andConditions.push({ type: { in: [PartyType.SUPPLIER, PartyType.BOTH] } });
+      } else {
+        andConditions.push({ type: filters.type as PartyType });
+      }
     }
 
     // Status filter

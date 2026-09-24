@@ -12,10 +12,10 @@ interface POLineItemRow {
   itemCode?: string;
   itemName?: string;
   unit?: string;
-  quantity: number;
-  rate: number;
-  discountPercent: number;
-  taxPercent: number;
+  quantity: number | string;
+  rate: number | string;
+  discountPercent: number | string;
+  taxPercent: number | string;
   total: number;
 }
 
@@ -115,11 +115,11 @@ export const POMasterPage: React.FC = () => {
     // Default first line if items exist in database
     if (items.length > 0) {
       const first = items[0];
-      const initialQty = 10;
-      const initialRate = 100;
+      const initialQty = 1;
+      const initialRate = '';
       const initialDisc = 0;
       const initialTax = 18;
-      const lineTotal = computeLineTotal(initialQty, initialRate, initialDisc, initialTax);
+      const lineTotal = 0; // Empty rate produces no pre-filled total
 
       setLineItems([
         {
@@ -152,14 +152,21 @@ export const POMasterPage: React.FC = () => {
         row.itemName = itemMatch.name;
         row.unit = itemMatch.unit;
       }
+      // CRITICAL: Item selection must NEVER auto-populate or overwrite Unit Rate.
+      // Unit rate must be manually entered by the user.
     }
 
-    row.total = computeLineTotal(
-      Number(row.quantity),
-      Number(row.rate),
-      Number(row.discountPercent),
-      Number(row.taxPercent)
-    );
+    const rateNum = typeof row.rate === 'string' ? (row.rate.trim() === '' ? NaN : parseFloat(row.rate)) : Number(row.rate);
+    const qtyNum = typeof row.quantity === 'string' ? (row.quantity.trim() === '' ? NaN : parseFloat(row.quantity)) : Number(row.quantity);
+    const discNum = typeof row.discountPercent === 'string' ? (row.discountPercent.trim() === '' ? 0 : parseFloat(row.discountPercent)) : (Number(row.discountPercent) || 0);
+    const taxNum = typeof row.taxPercent === 'string' ? (row.taxPercent.trim() === '' ? 0 : parseFloat(row.taxPercent)) : (Number(row.taxPercent) || 0);
+
+    if (isNaN(rateNum) || isNaN(qtyNum) || rateNum <= 0 || qtyNum <= 0) {
+      row.total = 0;
+    } else {
+      row.total = computeLineTotal(qtyNum, rateNum, discNum, taxNum);
+    }
+
     updated[index] = row;
     setLineItems(updated);
   };
@@ -180,10 +187,10 @@ export const POMasterPage: React.FC = () => {
     }
 
     const defaultQty = 1;
-    const defaultRate = 50;
+    const defaultRate = ''; // Newly added line starts with EMPTY Unit Rate
     const defaultDisc = 0;
     const defaultTax = 18;
-    const defaultTotal = computeLineTotal(defaultQty, defaultRate, defaultDisc, defaultTax);
+    const defaultTotal = 0;
 
     setLineItems([
       ...lineItems,
@@ -218,16 +225,23 @@ export const POMasterPage: React.FC = () => {
   let grandTotal = 0;
 
   for (const line of lineItems) {
-    const gross = round2((Number(line.quantity) || 0) * (Number(line.rate) || 0));
-    const disc = round2(gross * ((Number(line.discountPercent) || 0) / 100));
-    const taxable = round2(gross - disc);
-    const tax = round2(taxable * ((Number(line.taxPercent) || 0) / 100));
-    const total = round2(taxable + tax);
+    const rateNum = typeof line.rate === 'string' ? (line.rate.trim() === '' ? NaN : parseFloat(line.rate)) : Number(line.rate);
+    const qtyNum = typeof line.quantity === 'string' ? (line.quantity.trim() === '' ? NaN : parseFloat(line.quantity)) : Number(line.quantity);
+    const discNum = typeof line.discountPercent === 'string' ? (line.discountPercent.trim() === '' ? 0 : parseFloat(line.discountPercent)) : (Number(line.discountPercent) || 0);
+    const taxNum = typeof line.taxPercent === 'string' ? (line.taxPercent.trim() === '' ? 0 : parseFloat(line.taxPercent)) : (Number(line.taxPercent) || 0);
 
-    subtotal = round2(subtotal + gross);
-    totalDiscount = round2(totalDiscount + disc);
-    totalTax = round2(totalTax + tax);
-    grandTotal = round2(grandTotal + total);
+    if (!isNaN(rateNum) && !isNaN(qtyNum) && rateNum > 0 && qtyNum > 0) {
+      const gross = round2(qtyNum * rateNum);
+      const disc = round2(gross * (discNum / 100));
+      const taxable = round2(gross - disc);
+      const tax = round2(taxable * (taxNum / 100));
+      const total = round2(taxable + tax);
+
+      subtotal = round2(subtotal + gross);
+      totalDiscount = round2(totalDiscount + disc);
+      totalTax = round2(totalTax + tax);
+      grandTotal = round2(grandTotal + total);
+    }
   }
 
   // Submit PO
@@ -261,19 +275,31 @@ export const POMasterPage: React.FC = () => {
         setCreateError('Please select an item for all lines.');
         return;
       }
-      if (!item.quantity || item.quantity <= 0) {
+      const qtyNum = typeof item.quantity === 'string' ? (item.quantity.trim() === '' ? NaN : parseFloat(item.quantity)) : Number(item.quantity);
+      if (isNaN(qtyNum) || qtyNum <= 0) {
         setCreateError(`Quantity must be greater than 0 for ${item.itemName || 'item'}.`);
         return;
       }
-      if (item.rate === undefined || item.rate < 0) {
-        setCreateError(`Unit rate cannot be negative for ${item.itemName || 'item'}.`);
+
+      // Check Unit Rate
+      const rateStr = typeof item.rate === 'string' ? item.rate.trim() : (item.rate !== undefined && item.rate !== null ? String(item.rate) : '');
+      if (!rateStr) {
+        setCreateError('Unit Rate is required.');
         return;
       }
-      if (item.discountPercent < 0 || item.discountPercent > 100) {
+      const rateNum = parseFloat(rateStr);
+      if (isNaN(rateNum) || rateNum <= 0) {
+        setCreateError('Unit Rate is required.');
+        return;
+      }
+
+      const discNum = typeof item.discountPercent === 'string' ? (item.discountPercent.trim() === '' ? 0 : parseFloat(item.discountPercent)) : (Number(item.discountPercent) || 0);
+      if (isNaN(discNum) || discNum < 0 || discNum > 100) {
         setCreateError(`Discount % must be between 0 and 100 for ${item.itemName || 'item'}.`);
         return;
       }
-      if (item.taxPercent < 0 || item.taxPercent > 100) {
+      const taxNum = typeof item.taxPercent === 'string' ? (item.taxPercent.trim() === '' ? 0 : parseFloat(item.taxPercent)) : (Number(item.taxPercent) || 0);
+      if (isNaN(taxNum) || taxNum < 0 || taxNum > 100) {
         setCreateError(`GST % must be between 0 and 100 for ${item.itemName || 'item'}.`);
         return;
       }
@@ -675,8 +701,9 @@ export const POMasterPage: React.FC = () => {
                           type="number"
                           min="0.1"
                           step="any"
-                          value={line.quantity}
-                          onChange={(e) => updateLine(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                          placeholder="Qty"
+                          value={line.quantity === '' || line.quantity === undefined || line.quantity === null ? '' : line.quantity}
+                          onChange={(e) => updateLine(idx, 'quantity', e.target.value)}
                           className="w-full px-2 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-right"
                         />
                       </td>
@@ -684,11 +711,21 @@ export const POMasterPage: React.FC = () => {
                       <td className="p-2">
                         <input
                           type="number"
-                          min="0"
+                          min="0.01"
                           step="any"
-                          value={line.rate}
-                          onChange={(e) => updateLine(idx, 'rate', parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-right font-mono"
+                          placeholder="Enter unit rate"
+                          value={line.rate === '' || line.rate === undefined || line.rate === null ? '' : line.rate}
+                          onChange={(e) => {
+                            updateLine(idx, 'rate', e.target.value);
+                            if (createError && createError.toLowerCase().includes('rate')) {
+                              setCreateError('');
+                            }
+                          }}
+                          className={`w-full px-2 py-1.5 text-xs bg-white border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-right font-mono transition-colors ${
+                            createError && (line.rate === '' || line.rate === undefined || line.rate === null || parseFloat(String(line.rate)) <= 0)
+                              ? 'border-rose-400 bg-rose-50/20'
+                              : 'border-slate-200'
+                          }`}
                         />
                       </td>
                       <td className="p-2">
@@ -697,15 +734,15 @@ export const POMasterPage: React.FC = () => {
                           min="0"
                           max="100"
                           step="0.5"
-                          value={line.discountPercent}
-                          onChange={(e) => updateLine(idx, 'discountPercent', parseFloat(e.target.value) || 0)}
+                          value={line.discountPercent === '' || line.discountPercent === undefined || line.discountPercent === null ? '' : line.discountPercent}
+                          onChange={(e) => updateLine(idx, 'discountPercent', e.target.value)}
                           className="w-full px-2 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-right"
                         />
                       </td>
                       <td className="p-2">
                         <select
                           value={line.taxPercent}
-                          onChange={(e) => updateLine(idx, 'taxPercent', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => updateLine(idx, 'taxPercent', e.target.value)}
                           className="w-full px-2 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-right font-mono"
                         >
                           <option value="0">0%</option>
@@ -716,7 +753,9 @@ export const POMasterPage: React.FC = () => {
                         </select>
                       </td>
                       <td className="p-2 text-right font-mono font-semibold text-slate-800">
-                        ₹ {line.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {line.total > 0
+                          ? `₹ ${line.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : '—'}
                       </td>
                       <td className="p-2 text-center">
                         <button

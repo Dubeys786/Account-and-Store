@@ -14,6 +14,9 @@ import {
   Store as StoreIcon,
   ArrowDownRight,
   CreditCard,
+  User,
+  Phone,
+  ExternalLink,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/common/Card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/common/Table';
@@ -55,7 +58,18 @@ interface CustomerPartyItem {
   code: string;
   name: string;
   type: string;
+  phone?: string;
+  mobile?: string;
+  balance?: number;
+  balanceType?: string;
+  formattedBalance?: string;
+  creditLimit?: number;
   storeId?: string | null;
+  store?: {
+    id: string;
+    code: string;
+    name: string;
+  };
 }
 
 interface ReceivableInvoiceOption {
@@ -88,6 +102,9 @@ export const ReceiptsPage: React.FC = () => {
   // Metadata dropdowns
   const [stores, setStores] = useState<StoreItem[]>([]);
   const [customers, setCustomers] = useState<CustomerPartyItem[]>([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(true);
+  const [customerError, setCustomerError] = useState<string | null>(null);
+  const [customerSearch, setCustomerSearch] = useState('');
 
   // Create Receipt Voucher Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -127,13 +144,25 @@ export const ReceiptsPage: React.FC = () => {
   };
 
   const fetchMetadata = async () => {
-    const [storesRes, partiesRes] = await Promise.all([
-      apiRequest<StoreItem[]>('/accounts/stores'),
-      apiRequest<CustomerPartyItem[]>('/accounts/parties?type=CUSTOMER'),
-    ]);
+    setLoadingCustomers(true);
+    setCustomerError(null);
+    try {
+      const [storesRes, partiesRes] = await Promise.all([
+        apiRequest<StoreItem[]>('/accounts/stores'),
+        apiRequest<CustomerPartyItem[]>('/accounts/parties?type=CUSTOMER,BOTH,DEALER,DISTRIBUTOR&limit=500'),
+      ]);
 
-    if (storesRes.success && storesRes.data) setStores(storesRes.data);
-    if (partiesRes.success && partiesRes.data) setCustomers(partiesRes.data);
+      if (storesRes.success && storesRes.data) setStores(storesRes.data);
+      if (partiesRes.success && Array.isArray(partiesRes.data)) {
+        setCustomers(partiesRes.data);
+      } else if (!partiesRes.success) {
+        setCustomerError(partiesRes.message || 'Failed to load customers from server.');
+      }
+    } catch (err: any) {
+      setCustomerError(err?.message || 'Network error loading customers.');
+    } finally {
+      setLoadingCustomers(false);
+    }
   };
 
   useEffect(() => {
@@ -186,7 +215,7 @@ export const ReceiptsPage: React.FC = () => {
   };
 
   const handleOpenCreateModal = () => {
-    setPartyId(customers[0]?.id || '');
+    setPartyId('');
     setStoreId(stores[0]?.id || '');
     setTransactionId('');
     setAmount('');
@@ -194,13 +223,23 @@ export const ReceiptsPage: React.FC = () => {
     setPaymentMethod('Bank');
     setReferenceNumber('');
     setNotes('');
+    setCustomerSearch('');
     setFormError(null);
     setFormSuccess(null);
     setIsCreateModalOpen(true);
+    if (customers.length === 0 || customerError) {
+      fetchMetadata();
+    }
   };
 
   const handleRecordReceipt = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!partyId) {
+      setFormError('Please select a Customer (Party) to record the receipt voucher.');
+      return;
+    }
+
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
       setFormError('Please enter a valid receipt collection amount greater than zero.');
@@ -281,7 +320,19 @@ export const ReceiptsPage: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  const selectedCustomerName = customers.find((c) => c.id === partyId)?.name || 'Customer';
+  const selectedCustomer = customers.find((c) => c.id === partyId);
+  const selectedCustomerName = selectedCustomer?.name || 'Customer';
+
+  const filteredCustomers = customers.filter((c) => {
+    if (!customerSearch.trim()) return true;
+    const q = customerSearch.toLowerCase().trim();
+    return (
+      c.name.toLowerCase().includes(q) ||
+      (c.code && c.code.toLowerCase().includes(q)) ||
+      (c.phone && c.phone.toLowerCase().includes(q)) ||
+      (c.mobile && c.mobile.toLowerCase().includes(q))
+    );
+  });
   const totalAmountReceived = receipts.reduce((sum, r) => sum + r.amount, 0);
 
   return (
@@ -544,25 +595,201 @@ export const ReceiptsPage: React.FC = () => {
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Customer (Party) <span className="text-rose-500">*</span>
-              </label>
+            <div className="sm:col-span-2">
+              <div className="flex items-center justify-between mb-1">
+                <label htmlFor="customer-select" className="block text-xs font-semibold text-slate-700">
+                  Customer (Party) <span className="text-rose-500">*</span>
+                </label>
+                {customers.length > 0 && (
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    {customers.length} customer{customers.length === 1 ? '' : 's'} available
+                  </span>
+                )}
+              </div>
+
+              {/* Searchable input when customers are loaded */}
+              {customers.length > 3 && (
+                <div className="relative mb-1.5">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    placeholder="Search customer by name, code, phone..."
+                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white"
+                  />
+                  {customerSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomerSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-slate-600 font-bold"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              )}
+
               <select
+                id="customer-select"
                 value={partyId}
                 onChange={(e) => {
-                  setPartyId(e.target.value);
+                  const selectedId = e.target.value;
+                  setPartyId(selectedId);
                   setTransactionId('');
+                  const cust = customers.find((c) => c.id === selectedId);
+                  if (cust?.storeId) {
+                    setStoreId(cust.storeId);
+                  }
+                  if (formError && (formError.toLowerCase().includes('customer') || formError.toLowerCase().includes('party'))) {
+                    setFormError(null);
+                  }
                 }}
                 required
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                disabled={loadingCustomers}
+                className={`w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white transition-colors ${
+                  !partyId && formError ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'
+                }`}
               >
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.code})
+                {loadingCustomers ? (
+                  <option value="" disabled>
+                    Loading customers...
                   </option>
-                ))}
+                ) : customerError ? (
+                  <option value="" disabled>
+                    Failed to load customers: {customerError}
+                  </option>
+                ) : customers.length === 0 ? (
+                  <option value="" disabled>
+                    No customers found. Add a customer first.
+                  </option>
+                ) : (
+                  <>
+                    <option value="">-- Select Customer (Party) * --</option>
+                    {filteredCustomers.length === 0 ? (
+                      <option value="" disabled>
+                        No customers match "{customerSearch}"
+                      </option>
+                    ) : (
+                      filteredCustomers.map((c) => {
+                        const metaParts: string[] = [];
+                        if (c.code) metaParts.push(c.code);
+                        const phone = c.phone || c.mobile;
+                        if (phone) metaParts.push(`📞 ${phone}`);
+                        if (c.formattedBalance) {
+                          metaParts.push(`⚖️ Bal: ${c.formattedBalance}`);
+                        } else if (c.balance !== undefined && c.balance !== null) {
+                          metaParts.push(`⚖️ Bal: ₹${c.balance.toFixed(2)}`);
+                        }
+                        const metaStr = metaParts.length > 0 ? ` (${metaParts.join(' • ')})` : '';
+                        return (
+                          <option key={c.id} value={c.id}>
+                            {c.name}{metaStr}
+                          </option>
+                        );
+                      })
+                    )}
+                  </>
+                )}
               </select>
+
+              {/* State Banners: Loading, Error, Empty */}
+              {loadingCustomers && (
+                <div className="flex items-center gap-1.5 text-[11px] text-blue-600 mt-1.5 animate-pulse">
+                  <RefreshCw className="w-3 h-3 animate-spin" />
+                  <span>Loading existing customers from database...</span>
+                </div>
+              )}
+
+              {customerError && (
+                <div className="mt-2 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
+                    <span>{customerError}</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchMetadata}
+                    className="text-[11px] py-0.5 px-2 border-rose-300 text-rose-700 hover:bg-rose-100"
+                  >
+                    Retry
+                  </Button>
+                </div>
+              )}
+
+              {!loadingCustomers && !customerError && customers.length === 0 && (
+                <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+                    <span>No customers found. Add a customer first.</span>
+                  </div>
+                  <Link
+                    to="/accounts/parties"
+                    onClick={() => setIsCreateModalOpen(false)}
+                    className="inline-flex items-center gap-1 font-semibold text-amber-900 hover:underline text-xs shrink-0"
+                  >
+                    Add in Party Master <ExternalLink className="w-3 h-3" />
+                  </Link>
+                </div>
+              )}
+
+              {/* Selected Customer Context & Ledger Balance Card */}
+              {selectedCustomer && (
+                <div className="mt-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-800 flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-blue-600" />
+                      {selectedCustomer.name}
+                      <span className="text-[10px] text-slate-400 font-mono font-normal">({selectedCustomer.code})</span>
+                    </span>
+                    <Link
+                      to={`/accounts/ledger?partyId=${selectedCustomer.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 font-medium"
+                    >
+                      View Ledger <ExternalLink className="w-2.5 h-2.5" />
+                    </Link>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-600 pt-0.5">
+                    {(selectedCustomer.phone || selectedCustomer.mobile) && (
+                      <span className="flex items-center gap-1">
+                        <Phone className="w-3 h-3 text-slate-400" />
+                        {selectedCustomer.phone || selectedCustomer.mobile}
+                      </span>
+                    )}
+                    <span>
+                      Current Balance:{' '}
+                      <strong className={
+                        (selectedCustomer.balanceType === 'DEBIT' && (selectedCustomer.balance ?? 0) > 0)
+                          ? 'text-rose-600 font-mono font-bold'
+                          : (selectedCustomer.balanceType === 'CREDIT' && (selectedCustomer.balance ?? 0) > 0)
+                          ? 'text-emerald-600 font-mono font-bold'
+                          : 'text-slate-700 font-mono font-bold'
+                      }>
+                        {selectedCustomer.formattedBalance || (
+                          selectedCustomer.balance !== undefined
+                            ? `₹${selectedCustomer.balance.toFixed(2)} ${selectedCustomer.balanceType || 'DEBIT'}`
+                            : '₹0.00 Dr'
+                        )}
+                      </strong>
+                      {(selectedCustomer.balanceType === 'DEBIT' && (selectedCustomer.balance ?? 0) > 0) && (
+                        <span className="text-[10px] text-rose-500 ml-1 font-medium">(Receivable)</span>
+                      )}
+                      {(selectedCustomer.balanceType === 'CREDIT' && (selectedCustomer.balance ?? 0) > 0) && (
+                        <span className="text-[10px] text-emerald-600 ml-1 font-medium">(Advance / Credit)</span>
+                      )}
+                    </span>
+                    {selectedCustomer.creditLimit ? (
+                      <span className="text-slate-500">
+                        Credit Limit: ₹{selectedCustomer.creditLimit.toLocaleString('en-IN')}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
