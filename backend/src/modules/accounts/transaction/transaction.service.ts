@@ -638,6 +638,7 @@ export class TransactionService {
               entryDate: new Date(),
               referenceType: 'VOID',
               referenceId: transaction.id,
+              storeId: transaction.storeId,
               narration: `[VOID REVERSAL] Reversal of ${transaction.invoiceNumber} - ${reason || 'Voided transaction'}`,
               totalAmount: totalReversal,
               lines: {

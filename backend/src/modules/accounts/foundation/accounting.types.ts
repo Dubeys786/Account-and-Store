@@ -13,6 +13,7 @@ export interface CreateJournalEntryInput {
   entryDate?: Date | string;
   referenceType?: string;
   referenceId?: string;
+  storeId?: string | null;
   narration: string;
   lines: JournalLineInput[];
 }
@@ -20,6 +21,7 @@ export interface CreateJournalEntryInput {
 export interface JournalQueryFilters {
   referenceType?: string;
   referenceId?: string;
+  storeId?: string | null;
   startDate?: string;
   endDate?: string;
   page?: number;

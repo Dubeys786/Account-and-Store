@@ -602,6 +602,7 @@ export class PurchaseAccountingService {
             entryDate: invoiceDate,
             referenceType: 'PURCHASE_WITH_PO',
             referenceId: po.id,
+            storeId: po.storeId,
             narration:
               dto.notes ||
               `Purchase bill ${invoiceNumber} booked against PO ${po.poNumber} (${supplier.name})`,
@@ -900,6 +901,7 @@ export class PurchaseAccountingService {
             entryDate: invoiceDate,
             referenceType: 'PURCHASE_WITHOUT_PO',
             referenceId: null,
+            storeId: dto.storeId,
             narration:
               dto.notes ||
               `Direct purchase invoice ${invoiceNumber} from ${party.name} (${dto.itemName || 'Direct Goods/Services'})`,

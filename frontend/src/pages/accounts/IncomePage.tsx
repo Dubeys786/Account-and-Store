@@ -231,6 +231,7 @@ export const IncomePage: React.FC = () => {
 
       if (res.success) {
         setSuccessMsg(`Income voucher recorded successfully! Voucher #${res.data?.income?.incomeNumber || ''}`);
+        window.dispatchEvent(new CustomEvent('accounts:transaction-posted'));
         setIsModalOpen(false);
         // Reset form
         setFormAmount('');

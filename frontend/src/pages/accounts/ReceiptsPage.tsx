@@ -276,6 +276,7 @@ export const ReceiptsPage: React.FC = () => {
 
     if (res.success) {
       setFormSuccess('Receipt voucher recorded successfully! Customer Ledger and Accounts updated.');
+      window.dispatchEvent(new CustomEvent('accounts:transaction-posted'));
       setTimeout(() => {
         setIsCreateModalOpen(false);
         fetchReceipts();

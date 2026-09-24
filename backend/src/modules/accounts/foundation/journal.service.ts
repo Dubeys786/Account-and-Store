@@ -152,6 +152,7 @@ export class JournalService {
           entryDate: input.entryDate ? new Date(input.entryDate) : new Date(),
           referenceType: input.referenceType || 'MANUAL',
           referenceId: input.referenceId || null,
+          storeId: input.storeId || null,
           narration: input.narration.trim(),
           totalAmount,
           lines: {

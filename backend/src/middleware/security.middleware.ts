@@ -77,9 +77,11 @@ export function preventParameterTampering(req: Request, res: Response, next: Nex
     req.query?.store_id ||
     req.headers['x-store-id'];
 
+  const isAll = typeof requestedStoreId === 'string' && requestedStoreId.toUpperCase() === 'ALL';
+
   if (
     requestedStoreId &&
-    requestedStoreId !== 'ALL' &&
+    !isAll &&
     req.user.role !== UserRole.ADMIN &&
     !req.user.storeIds.includes(requestedStoreId as string)
   ) {

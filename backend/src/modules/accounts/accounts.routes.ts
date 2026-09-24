@@ -17,6 +17,8 @@ import { ReceivablesService } from './receivables/receivables.service';
 import { ExpenseService } from './expense/expense.service';
 import { IncomeService } from './income/income.service';
 import { BooksService } from './books/books.service';
+import { CashBankPositionService } from './books/cash-bank-position.service';
+import { ContraTransferService } from './books/contra-transfer.service';
 import { ReportsService } from './reports/reports.service';
 import { AccountsSecurityError } from './accounts.guard';
 import { preventParameterTampering } from '../../middleware/security.middleware';
@@ -892,6 +894,54 @@ router.get('/bank-book', async (req: Request, res: Response) => {
       return;
     }
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==========================================
+// 9B. LIVE CASH & BANK POSITION & CONTRA TRANSFERS
+// ==========================================
+router.get('/cash-bank-position', async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
+    const result = await CashBankPositionService.getPosition(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      {
+        asOfDate: req.query.asOfDate as string | undefined,
+        storeId: req.query.storeId as string | undefined,
+      }
+    );
+    res.json({
+      success: true,
+      message: 'Live Cash & Bank Position calculated successfully.',
+      data: result,
+    });
+  } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.post('/contra-transfers', async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
+    const result = await ContraTransferService.createTransfer(
+      { id: user.id, role: user.role, storeIds: user.storeIds || [] },
+      req.body
+    );
+    res.status(201).json({
+      success: true,
+      message: result.message,
+      data: result.transfer,
+    });
+  } catch (error: any) {
+    if (error instanceof AccountsSecurityError) {
+      res.status(error.statusCode).json({ success: false, message: error.message });
+      return;
+    }
+    res.status(400).json({ success: false, message: error.message });
   }
 });
 

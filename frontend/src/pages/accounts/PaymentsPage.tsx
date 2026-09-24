@@ -249,6 +249,7 @@ export const PaymentsPage: React.FC = () => {
 
     if (res.success) {
       setFormSuccess('Payment voucher recorded successfully! Accounts and Ledgers updated.');
+      window.dispatchEvent(new CustomEvent('accounts:transaction-posted'));
       setTimeout(() => {
         setIsCreateModalOpen(false);
         fetchPayments();

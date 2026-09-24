@@ -27,6 +27,7 @@ import { Button } from '../../components/common/Button';
 import apiRequest from '../../services/api';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { CashBankPositionCard } from './components/CashBankPositionCard';
 
 interface DashboardMetrics {
   totalPayables: number;
@@ -212,6 +213,9 @@ export const AccountsDashboardPage: React.FC = () => {
           </Link>
         </div>
       </div>
+
+      {/* Real-time Live Cash & Bank Position Section */}
+      <CashBankPositionCard />
 
       {/* 10 Required KPI Cards */}
       <div>

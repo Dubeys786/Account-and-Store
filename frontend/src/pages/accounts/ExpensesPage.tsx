@@ -238,6 +238,7 @@ export const ExpensesPage: React.FC = () => {
 
       if (res.success) {
         setSuccessMsg(`Expense voucher recorded successfully! Voucher #${res.data?.expense?.expenseNumber || ''}`);
+        window.dispatchEvent(new CustomEvent('accounts:transaction-posted'));
         setIsModalOpen(false);
         // Reset form
         setFormAmount('');

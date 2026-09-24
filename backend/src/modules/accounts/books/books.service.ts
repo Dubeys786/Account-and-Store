@@ -340,13 +340,17 @@ export class BooksService {
     // A. Calculate Opening Cash (all cash journal lines strictly prior to startDate)
     let openingCash = 0;
     if (startDate) {
-      const priorAgg = await prisma.journalEntryLine.aggregate({
-        where: {
-          accountId: cashAccount.id,
-          journalEntry: {
-            entryDate: { lt: startDate },
-          },
+      const priorWhere: any = {
+        accountId: cashAccount.id,
+        journalEntry: {
+          entryDate: { lt: startDate },
         },
+      };
+      if (filters.storeId) {
+        priorWhere.journalEntry.storeId = filters.storeId;
+      }
+      const priorAgg = await prisma.journalEntryLine.aggregate({
+        where: priorWhere,
         _sum: {
           debitAmount: true,
           creditAmount: true,
@@ -358,12 +362,16 @@ export class BooksService {
     // B. Query transactions in the period
     const lineWhere: any = {
       accountId: cashAccount.id,
+      journalEntry: {},
     };
 
     if (startDate || endDate) {
-      lineWhere.journalEntry = { entryDate: {} };
+      lineWhere.journalEntry.entryDate = {};
       if (startDate) lineWhere.journalEntry.entryDate.gte = startDate;
       if (endDate) lineWhere.journalEntry.entryDate.lte = endDate;
+    }
+    if (filters.storeId) {
+      lineWhere.journalEntry.storeId = filters.storeId;
     }
 
     // Fetch all lines in period to calculate running balance and summary
@@ -376,6 +384,7 @@ export class BooksService {
       include: {
         journalEntry: {
           include: {
+            store: { select: { id: true, code: true, name: true } },
             lines: {
               include: {
                 account: { select: { id: true, code: true, name: true } },
@@ -416,6 +425,7 @@ export class BooksService {
         null;
 
       const store =
+        line.journalEntry.store ||
         line.journalEntry.accountingTransactions[0]?.store ||
         null;
 
@@ -491,13 +501,17 @@ export class BooksService {
     // A. Calculate Opening Bank Balance (all bank journal lines strictly prior to startDate)
     let openingBankBalance = 0;
     if (startDate) {
-      const priorAgg = await prisma.journalEntryLine.aggregate({
-        where: {
-          accountId: bankAccount.id,
-          journalEntry: {
-            entryDate: { lt: startDate },
-          },
+      const priorWhere: any = {
+        accountId: bankAccount.id,
+        journalEntry: {
+          entryDate: { lt: startDate },
         },
+      };
+      if (filters.storeId) {
+        priorWhere.journalEntry.storeId = filters.storeId;
+      }
+      const priorAgg = await prisma.journalEntryLine.aggregate({
+        where: priorWhere,
         _sum: {
           debitAmount: true,
           creditAmount: true,
@@ -509,12 +523,16 @@ export class BooksService {
     // B. Query transactions in the period
     const lineWhere: any = {
       accountId: bankAccount.id,
+      journalEntry: {},
     };
 
     if (startDate || endDate) {
-      lineWhere.journalEntry = { entryDate: {} };
+      lineWhere.journalEntry.entryDate = {};
       if (startDate) lineWhere.journalEntry.entryDate.gte = startDate;
       if (endDate) lineWhere.journalEntry.entryDate.lte = endDate;
+    }
+    if (filters.storeId) {
+      lineWhere.journalEntry.storeId = filters.storeId;
     }
 
     const periodLines = await prisma.journalEntryLine.findMany({
@@ -526,6 +544,7 @@ export class BooksService {
       include: {
         journalEntry: {
           include: {
+            store: { select: { id: true, code: true, name: true } },
             lines: {
               include: {
                 account: { select: { id: true, code: true, name: true } },
@@ -565,6 +584,7 @@ export class BooksService {
         null;
 
       const store =
+        line.journalEntry.store ||
         line.journalEntry.accountingTransactions[0]?.store ||
         null;
 
@@ -583,6 +603,7 @@ export class BooksService {
         runningBalance: Math.round(currentBalance * 100) / 100,
       };
     });
+
 
     // Tenancy filtering if applicable
     let filteredEntries = entries;

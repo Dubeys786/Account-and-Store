@@ -31,6 +31,7 @@ import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import apiRequest from '../../services/api';
 import { EmailReportModal } from './components/EmailReportModal';
+import { CashBankPositionCard } from './components/CashBankPositionCard';
 
 export type ReportType =
   | 'PARTY_LEDGER'
@@ -406,6 +407,9 @@ export const AccountsReportsPage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Real-time Live Cash & Bank Position Section */}
+      <CashBankPositionCard className="print:hidden" />
 
       {/* 14 Reports Selector Tabs / Dropdown */}
       <Card className="print:hidden">
