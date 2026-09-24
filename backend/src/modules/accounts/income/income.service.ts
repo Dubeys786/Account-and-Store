@@ -197,6 +197,7 @@ export class IncomeService {
           data: {
             entryNumber: journalNumber,
             entryDate: incomeDate,
+            storeId: store.id,
             referenceType: 'INCOME',
             narration,
             totalAmount: amount,

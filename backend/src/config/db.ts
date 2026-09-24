@@ -250,6 +250,60 @@ export async function initDatabase(): Promise<void> {
       console.warn('PO items unit column check:', e.message || e);
     }
 
+    // Live Cash & Bank Position: Ensure storeId exists on journal_entries, payments, receipts
+    try {
+      await pglite.exec(`
+        ALTER TABLE "journal_entries" ADD COLUMN IF NOT EXISTS "storeId" TEXT REFERENCES "stores"("id");
+        CREATE INDEX IF NOT EXISTS "journal_entries_storeId_idx" ON "journal_entries"("storeId");
+
+        ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "storeId" TEXT REFERENCES "stores"("id");
+        CREATE INDEX IF NOT EXISTS "payments_storeId_idx" ON "payments"("storeId");
+
+        ALTER TABLE "receipts" ADD COLUMN IF NOT EXISTS "storeId" TEXT REFERENCES "stores"("id");
+        CREATE INDEX IF NOT EXISTS "receipts_storeId_idx" ON "receipts"("storeId");
+
+        -- Backfill journal_entries.storeId from accounting_transactions
+        UPDATE "journal_entries" je
+        SET "storeId" = at."storeId"
+        FROM "accounting_transactions" at
+        WHERE je."id" = at."journalEntryId" AND je."storeId" IS NULL;
+
+        -- Backfill journal_entries.storeId from expenses
+        UPDATE "journal_entries" je
+        SET "storeId" = e."storeId"
+        FROM "expenses" e
+        WHERE (je."referenceId" = e."id" OR je."entryNumber" = 'JV-' || e."expenseNumber")
+          AND je."storeId" IS NULL;
+
+        -- Backfill journal_entries.storeId from income
+        UPDATE "journal_entries" je
+        SET "storeId" = i."storeId"
+        FROM "income" i
+        WHERE (je."referenceId" = i."id" OR je."entryNumber" = 'JV-' || i."incomeNumber")
+          AND je."storeId" IS NULL;
+
+        -- Backfill payments.storeId from accounting_transactions
+        UPDATE "payments" p
+        SET "storeId" = at."storeId"
+        FROM "accounting_transactions" at
+        WHERE p."transactionId" = at."id" AND p."storeId" IS NULL;
+
+        -- Backfill payments & receipts storeId from parties if store-assigned
+        UPDATE "payments" p
+        SET "storeId" = prt."storeId"
+        FROM "parties" prt
+        WHERE p."partyId" = prt."id" AND p."storeId" IS NULL AND prt."storeId" IS NOT NULL;
+
+        UPDATE "receipts" r
+        SET "storeId" = prt."storeId"
+        FROM "parties" prt
+        WHERE r."partyId" = prt."id" AND r."storeId" IS NULL AND prt."storeId" IS NOT NULL;
+      `);
+      console.log('✅ Cash & Bank position schema verified (journal_entries, payments, receipts storeId columns).');
+    } catch (e: any) {
+      console.warn('Cash & Bank storeId schema check:', e.message || e);
+    }
+
     // Notification System Schema
     try {
       await pglite.exec(`

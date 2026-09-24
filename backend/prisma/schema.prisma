@@ -204,6 +204,9 @@ model Store {
   expenses               Expense[]
   income                 Income[]
   parties                Party[]
+  payments               Payment[]
+  receipts               Receipt[]
+  journalEntries         JournalEntry[]
 
   @@map("stores")
 }
@@ -445,17 +448,20 @@ model JournalEntry {
   id            String   @id @default(uuid())
   entryNumber   String   @unique
   entryDate     DateTime @default(now())
-  referenceType String?  // PURCHASE, SALE, PAYMENT, RECEIPT, EXPENSE, INCOME, OPENING_BALANCE, ADJUSTMENT, MANUAL
+  storeId       String?
+  referenceType String?  // PURCHASE, SALE, PAYMENT, RECEIPT, EXPENSE, INCOME, OPENING_BALANCE, ADJUSTMENT, CONTRA, MANUAL
   referenceId   String?
   narration     String
   totalAmount   Float
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  store                  Store?                  @relation(fields: [storeId], references: [id])
   lines                  JournalEntryLine[]
   accountingTransactions AccountingTransaction[]
 
   @@index([entryDate])
+  @@index([storeId])
   @@map("journal_entries")
 }
 
@@ -517,6 +523,7 @@ model Payment {
   id            String      @id @default(uuid())
   paymentNumber String      @unique
   paymentDate   DateTime    @default(now())
+  storeId       String?
   partyId       String
   accountId     String      // Bank or Cash Ledger Account
   transactionId String?     // Link to AccountingTransaction
@@ -527,10 +534,12 @@ model Payment {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
+  store       Store?                 @relation(fields: [storeId], references: [id])
   party       Party                  @relation(fields: [partyId], references: [id])
   account     LedgerAccount          @relation(fields: [accountId], references: [id])
   transaction AccountingTransaction? @relation(fields: [transactionId], references: [id])
 
+  @@index([storeId])
   @@index([partyId])
   @@index([accountId])
   @@map("payments")
@@ -540,6 +549,7 @@ model Receipt {
   id            String      @id @default(uuid())
   receiptNumber String      @unique
   receiptDate   DateTime    @default(now())
+  storeId       String?
   partyId       String
   accountId     String      // Bank or Cash Ledger Account
   amount        Float
@@ -549,9 +559,11 @@ model Receipt {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
+  store   Store?        @relation(fields: [storeId], references: [id])
   party   Party         @relation(fields: [partyId], references: [id])
   account LedgerAccount @relation(fields: [accountId], references: [id])
 
+  @@index([storeId])
   @@index([partyId])
   @@index([accountId])
   @@map("receipts")

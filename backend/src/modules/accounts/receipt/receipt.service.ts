@@ -214,6 +214,7 @@ export class ReceiptService {
           data: {
             entryNumber: journalNumber,
             entryDate: receiptDate,
+            storeId: dto.storeId,
             referenceType: 'RECEIPT',
             referenceId: targetInvoice?.id || null,
             narration,
@@ -236,6 +237,7 @@ export class ReceiptService {
           data: {
             receiptNumber,
             receiptDate,
+            storeId: dto.storeId,
             partyId: party.id,
             accountId: depositAccountId,
             amount,

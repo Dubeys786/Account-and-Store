@@ -200,6 +200,7 @@ export class ExpenseService {
           data: {
             entryNumber: journalNumber,
             entryDate: expenseDate,
+            storeId: store.id,
             referenceType: 'EXPENSE',
             narration,
             totalAmount: amount,

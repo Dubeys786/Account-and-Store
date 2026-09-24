@@ -202,6 +202,7 @@ export class PaymentService {
           data: {
             entryNumber: journalNumber,
             entryDate: paymentDate,
+            storeId: dto.storeId,
             referenceType: 'PAYMENT',
             referenceId: targetInvoice?.id || null,
             narration,
@@ -224,6 +225,7 @@ export class PaymentService {
           data: {
             paymentNumber,
             paymentDate,
+            storeId: dto.storeId,
             partyId: party.id,
             accountId: disbursementAccountId,
             transactionId: targetInvoice?.id || null,
