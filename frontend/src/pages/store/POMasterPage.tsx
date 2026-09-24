@@ -19,6 +19,16 @@ interface POLineItemRow {
   total: number;
 }
 
+export const UOM_OPTIONS = [
+  { value: 'PCS', label: 'Pieces (PCS)' },
+  { value: 'BOX', label: 'Boxes (BOX)' },
+  { value: 'KG', label: 'Kilograms (KG)' },
+  { value: 'GM', label: 'Grams (GM)' },
+  { value: 'LTR', label: 'Liters (LTR)' },
+  { value: 'MTR', label: 'Meters (MTR)' },
+  { value: 'SET', label: 'Sets (SET)' },
+];
+
 export const POMasterPage: React.FC = () => {
   const [pos, setPos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +49,15 @@ export const POMasterPage: React.FC = () => {
   const [formExpectedDelivery, setFormExpectedDelivery] = useState('');
   const [formNotes, setFormNotes] = useState('');
   const [lineItems, setLineItems] = useState<POLineItemRow[]>([]);
+
+  // Available UOM list combining system standards and item master units
+  const availableUnits = [
+    ...UOM_OPTIONS,
+    ...itemsList
+      .map((it) => it.unit)
+      .filter((u): u is string => Boolean(u) && !UOM_OPTIONS.some((opt) => opt.value.toUpperCase() === u.toUpperCase()))
+      .map((u) => ({ value: u, label: u })),
+  ];
 
   // View Details Modal State
   const [viewingPO, setViewingPO] = useState<any | null>(null);
@@ -102,7 +121,7 @@ export const POMasterPage: React.FC = () => {
   const handleOpenCreate = async () => {
     setCreateError('');
     // Refresh lookups to guarantee current real database records
-    const { items, suppliers, stores } = await fetchLookups();
+    const { suppliers, stores } = await fetchLookups();
 
     const selectedParty = suppliers.length > 0 ? suppliers[0].id : '';
     const selectedStore = stores.length > 0 ? stores[0].id : '';
@@ -112,31 +131,20 @@ export const POMasterPage: React.FC = () => {
     setFormExpectedDelivery('');
     setFormNotes('');
 
-    // Default first line if items exist in database
-    if (items.length > 0) {
-      const first = items[0];
-      const initialQty = 1;
-      const initialRate = '';
-      const initialDisc = 0;
-      const initialTax = 18;
-      const lineTotal = 0; // Empty rate produces no pre-filled total
-
-      setLineItems([
-        {
-          itemId: first.id,
-          itemCode: first.code,
-          itemName: first.name,
-          unit: first.unit || 'PCS',
-          quantity: initialQty,
-          rate: initialRate,
-          discountPercent: initialDisc,
-          taxPercent: initialTax,
-          total: lineTotal,
-        },
-      ]);
-    } else {
-      setLineItems([]);
-    }
+    // Default first line: Unit and Rate MUST be initially EMPTY
+    setLineItems([
+      {
+        itemId: '',
+        itemCode: '',
+        itemName: '',
+        unit: '', // CRITICAL: Unit/UOM initially EMPTY
+        quantity: 1,
+        rate: '', // CRITICAL: Unit Rate initially EMPTY
+        discountPercent: 0,
+        taxPercent: 18,
+        total: 0,
+      },
+    ]);
     setIsCreateOpen(true);
   };
 
@@ -150,10 +158,14 @@ export const POMasterPage: React.FC = () => {
       if (itemMatch) {
         row.itemCode = itemMatch.code;
         row.itemName = itemMatch.name;
-        row.unit = itemMatch.unit;
+      } else {
+        row.itemCode = '';
+        row.itemName = '';
       }
-      // CRITICAL: Item selection must NEVER auto-populate or overwrite Unit Rate.
-      // Unit rate must be manually entered by the user.
+      // CRITICAL REQUIREMENTS:
+      // 1. Selecting an item must NEVER auto-populate or overwrite Unit/UOM (row.unit remains untouched).
+      // 2. Selecting an item must NEVER auto-populate or overwrite Unit Rate (row.rate remains untouched).
+      // The user must explicitly choose Unit/UOM and enter Unit Rate.
     }
 
     const rateNum = typeof row.rate === 'string' ? (row.rate.trim() === '' ? NaN : parseFloat(row.rate)) : Number(row.rate);
@@ -178,14 +190,6 @@ export const POMasterPage: React.FC = () => {
       return;
     }
 
-    // Pick first unused item or fallback to first item
-    const usedIds = new Set(lineItems.map((l) => l.itemId));
-    const available = itemsList.find((it) => !usedIds.has(it.id)) || itemsList[0];
-    if (!available) {
-      setCreateError('No items available. Please create an item first.');
-      return;
-    }
-
     const defaultQty = 1;
     const defaultRate = ''; // Newly added line starts with EMPTY Unit Rate
     const defaultDisc = 0;
@@ -195,10 +199,10 @@ export const POMasterPage: React.FC = () => {
     setLineItems([
       ...lineItems,
       {
-        itemId: available.id,
-        itemCode: available.code,
-        itemName: available.name,
-        unit: available.unit || 'PCS',
+        itemId: '',
+        itemCode: '',
+        itemName: '',
+        unit: '', // Newly added line starts with EMPTY Unit/UOM
         quantity: defaultQty,
         rate: defaultRate,
         discountPercent: defaultDisc,
@@ -281,6 +285,13 @@ export const POMasterPage: React.FC = () => {
         return;
       }
 
+      // Check Unit / UOM
+      const unitStr = typeof item.unit === 'string' ? item.unit.trim() : '';
+      if (!unitStr) {
+        setCreateError('Unit / UOM is required.');
+        return;
+      }
+
       // Check Unit Rate
       const rateStr = typeof item.rate === 'string' ? item.rate.trim() : (item.rate !== undefined && item.rate !== null ? String(item.rate) : '');
       if (!rateStr) {
@@ -313,6 +324,7 @@ export const POMasterPage: React.FC = () => {
       notes: formNotes || undefined,
       items: lineItems.map((l) => ({
         itemId: l.itemId,
+        unit: (l.unit || '').trim(),
         quantity: Number(l.quantity),
         rate: Number(l.rate),
         discountPercent: Number(l.discountPercent) || 0,
@@ -666,14 +678,14 @@ export const POMasterPage: React.FC = () => {
               <table className="w-full text-xs text-left min-w-[650px]">
                 <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                   <tr>
-                    <th className="p-2.5 w-48">Item</th>
-                    <th className="p-2.5 w-24">Quantity</th>
-                    <th className="p-2.5 w-20">Unit</th>
-                    <th className="p-2.5 w-28">Unit Rate (₹)</th>
-                    <th className="p-2.5 w-20">Disc %</th>
-                    <th className="p-2.5 w-24">Tax % (GST)</th>
+                    <th className="p-2.5 w-44">Item *</th>
+                    <th className="p-2.5 w-20">Qty *</th>
+                    <th className="p-2.5 w-32">Unit / UOM *</th>
+                    <th className="p-2.5 w-28">Unit Rate (₹) *</th>
+                    <th className="p-2.5 w-16">Disc %</th>
+                    <th className="p-2.5 w-20">GST %</th>
                     <th className="p-2.5 w-28 text-right">Line Total (₹)</th>
-                    <th className="p-2.5 w-12 text-center"></th>
+                    <th className="p-2.5 w-10 text-center"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -682,18 +694,22 @@ export const POMasterPage: React.FC = () => {
                       <td className="p-2">
                         <select
                           value={line.itemId}
-                          onChange={(e) => updateLine(idx, 'itemId', e.target.value)}
-                          className="w-full px-2 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          onChange={(e) => {
+                            updateLine(idx, 'itemId', e.target.value);
+                            if (createError && createError.toLowerCase().includes('item')) {
+                              setCreateError('');
+                            }
+                          }}
+                          className={`w-full px-2 py-1.5 text-xs bg-white border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${
+                            createError && !line.itemId ? 'border-rose-400 bg-rose-50/20' : 'border-slate-200'
+                          }`}
                         >
-                          {itemsList.length === 0 ? (
-                            <option value="" disabled>No items available. Please create an item first.</option>
-                          ) : (
-                            itemsList.map((item) => (
-                              <option key={item.id} value={item.id}>
-                                {item.code} - {item.name}
-                              </option>
-                            ))
-                          )}
+                          <option value="">Select Item</option>
+                          {itemsList.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.code} - {item.name}
+                            </option>
+                          ))}
                         </select>
                       </td>
                       <td className="p-2">
@@ -707,7 +723,27 @@ export const POMasterPage: React.FC = () => {
                           className="w-full px-2 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-right"
                         />
                       </td>
-                      <td className="p-2 text-slate-500 font-medium">{line.unit || 'PCS'}</td>
+                      <td className="p-2">
+                        <select
+                          value={line.unit || ''}
+                          onChange={(e) => {
+                            updateLine(idx, 'unit', e.target.value);
+                            if (createError && createError.toLowerCase().includes('unit')) {
+                              setCreateError('');
+                            }
+                          }}
+                          className={`w-full px-2 py-1.5 text-xs bg-white border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors font-medium ${
+                            createError && !line.unit ? 'border-rose-400 bg-rose-50/20 text-rose-600' : 'border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          <option value="">Select Unit</option>
+                          {availableUnits.map((u) => (
+                            <option key={u.value} value={u.value}>
+                              {u.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
                       <td className="p-2">
                         <input
                           type="number"
@@ -902,7 +938,7 @@ export const POMasterPage: React.FC = () => {
                         <tr key={line.id}>
                           <td className="p-2.5 font-mono font-semibold text-blue-600">{line.item?.code}</td>
                           <td className="p-2.5 font-medium text-slate-800">{line.item?.name}</td>
-                          <td className="p-2.5 text-right font-mono font-semibold">{line.quantity} {line.item?.unit}</td>
+                          <td className="p-2.5 text-right font-mono font-semibold">{line.quantity} {line.unit || line.item?.unit || ''}</td>
                           <td className="p-2.5 text-right font-mono">₹ {line.rate}</td>
                           <td className="p-2.5 text-right font-mono">{line.discountPercent}%</td>
                           <td className="p-2.5 text-right font-mono">{line.taxPercent}%</td>

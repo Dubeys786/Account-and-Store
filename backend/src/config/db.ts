@@ -240,6 +240,16 @@ export async function initDatabase(): Promise<void> {
       console.warn('Return Age schema evolution check:', e.message || e);
     }
 
+    // Purchase Order Items: Ensure unit column exists
+    try {
+      await pglite.exec(`
+        ALTER TABLE "purchase_order_items" ADD COLUMN IF NOT EXISTS "unit" TEXT;
+      `);
+      console.log('✅ Purchase Order Items schema verified (unit column).');
+    } catch (e: any) {
+      console.warn('PO items unit column check:', e.message || e);
+    }
+
     // Notification System Schema
     try {
       await pglite.exec(`

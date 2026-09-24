@@ -3,6 +3,7 @@ import { POStatus } from '@prisma/client';
 
 export interface POLineItemInput {
   itemId: string;
+  unit?: string;
   quantity: number;
   rate: number;
   discountPercent?: number;
@@ -141,6 +142,7 @@ export class POService {
 
           computedItems.push({
             itemId: line.itemId,
+            unit: line.unit && line.unit.trim() ? line.unit.trim() : null,
             quantity: line.quantity,
             rate: line.rate,
             discountPercent: discPct,

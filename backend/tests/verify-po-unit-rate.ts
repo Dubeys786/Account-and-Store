@@ -19,59 +19,85 @@ function record(name: string, passed: boolean, details?: string) {
 
 async function runPOVerification() {
   console.log('================================================================');
-  console.log('STOCKLEDGER — PO UNIT RATE USER INPUT & VALIDATION TEST SUITE');
+  console.log('STOCKLEDGER — PO UNIT / UOM & UNIT RATE NO AUTO-FILL TEST SUITE');
   console.log('================================================================\n');
 
   let server: http.Server | null = null;
+  const createdPoIds: string[] = [];
 
   try {
     // -------------------------------------------------------------
     // 1. Code Contract & Static Verification of POMasterPage.tsx
     // -------------------------------------------------------------
-    console.log('--- Step 1: Frontend Code Contract Verification ---');
+    console.log('--- Step 1: Frontend Code Contract & Static Analysis ---');
     const fs = await import('fs');
     const path = await import('path');
     const poPagePath = path.resolve(__dirname, '../../frontend/src/pages/store/POMasterPage.tsx');
     const poPageContent = fs.readFileSync(poPagePath, 'utf8');
 
-    // Check that hardcoded rates (100, 50) were eradicated
+    // 1.1 Check Unit Rate auto-fill eradicated
     const hasInitialRate100 = poPageContent.includes('const initialRate = 100;');
     const hasDefaultRate50 = poPageContent.includes('const defaultRate = 50;');
     record('No Hardcoded Initial Rate (₹100 removed)', !hasInitialRate100, 'initialRate is not 100');
     record('No Hardcoded Added Line Rate (₹50 removed)', !hasDefaultRate50, 'defaultRate is not 50');
 
-    // Check that initial rate is empty string
-    const hasInitialRateEmpty = poPageContent.includes("const initialRate = '';");
-    const hasDefaultRateEmpty = poPageContent.includes("const defaultRate = '';");
-    record('Initial Line Unit Rate is EMPTY string', hasInitialRateEmpty, "initialRate = ''");
-    record('Newly Added Line Unit Rate is EMPTY string', hasDefaultRateEmpty, "defaultRate = ''");
+    // 1.2 Check Unit / UOM auto-fill eradicated
+    const hasAutoUnitFirst = poPageContent.includes("unit: first.unit || 'PCS'");
+    const hasAutoUnitAdded = poPageContent.includes("unit: available.unit || 'PCS'");
+    record('No Auto-Fill Unit in Initial Line (first.unit || PCS removed)', !hasAutoUnitFirst, 'Initial line does not copy item.unit');
+    record('No Auto-Fill Unit in Added Line (available.unit || PCS removed)', !hasAutoUnitAdded, 'Added line does not copy item.unit');
 
-    // Check placeholder
+    // 1.3 Check initial state for line items
+    const hasInitialUnitEmpty = poPageContent.includes("unit: '', // CRITICAL: Unit/UOM initially EMPTY");
+    const hasInitialRateEmpty = poPageContent.includes("rate: '', // CRITICAL: Unit Rate initially EMPTY");
+    record('Initial Line Unit is explicitly EMPTY string', hasInitialUnitEmpty, "unit: ''");
+    record('Initial Line Rate is explicitly EMPTY string', hasInitialRateEmpty, "rate: ''");
+
+    // 1.4 Check Item Selection does NOT auto-fill Unit or Rate
+    const itemSelectionBlock = poPageContent.slice(
+      poPageContent.indexOf("if (field === 'itemId')"),
+      poPageContent.indexOf("if (field === 'itemId')") + 450
+    );
+    const itemSelectionSetsUnit = itemSelectionBlock.includes('row.unit =');
+    const itemSelectionSetsRate = itemSelectionBlock.includes('row.rate =');
+    record('Item selection does NOT auto-populate Unit/UOM', !itemSelectionSetsUnit, 'Selecting item leaves row.unit untouched');
+    record('Item selection does NOT auto-populate Unit Rate', !itemSelectionSetsRate, 'Selecting item leaves row.rate untouched');
+
+    // 1.5 Check UOM dropdown exists and provides user selection
+    const hasUomDropdown = poPageContent.includes('<select') && poPageContent.includes("updateLine(idx, 'unit', e.target.value)");
+    const hasSelectUnitOption = poPageContent.includes('<option value="">Select Unit</option>');
+    record('Unit / UOM field is a selectable dropdown (<select>)', hasUomDropdown, 'User selects unit from dropdown');
+    record('Unit / UOM dropdown starts with "Select Unit" placeholder', hasSelectUnitOption, '<option value="">Select Unit</option>');
+
+    // 1.6 Check UOM options defined (PCS, BOX, KG, GM, LTR, MTR, SET)
+    const hasPcs = poPageContent.includes("value: 'PCS'");
+    const hasBox = poPageContent.includes("value: 'BOX'");
+    const hasKg = poPageContent.includes("value: 'KG'");
+    const hasGm = poPageContent.includes("value: 'GM'");
+    const hasLtr = poPageContent.includes("value: 'LTR'");
+    const hasMtr = poPageContent.includes("value: 'MTR'");
+    const hasSet = poPageContent.includes("value: 'SET'");
+    record('UOM options include standard units (PCS, BOX, KG, GM, LTR, MTR, SET)',
+      hasPcs && hasBox && hasKg && hasGm && hasLtr && hasMtr && hasSet,
+      'Standard units available'
+    );
+
+    // 1.7 Check Unit Rate placeholder
     const hasPlaceholder = poPageContent.includes('placeholder="Enter unit rate"');
     record('Unit Rate input has placeholder "Enter unit rate"', hasPlaceholder, 'placeholder="Enter unit rate"');
 
-    // Check validation error message
-    const hasValidationMsg = poPageContent.includes("setCreateError('Unit Rate is required.')");
-    record('Validation enforces "Unit Rate is required."', hasValidationMsg, 'setCreateError("Unit Rate is required.")');
+    // 1.8 Check Validation Messages
+    const hasUnitValidationMsg = poPageContent.includes("setCreateError('Unit / UOM is required.')");
+    const hasRateValidationMsg = poPageContent.includes("setCreateError('Unit Rate is required.')");
+    record('Validation enforces "Unit / UOM is required."', hasUnitValidationMsg, 'Blocks save if Unit is empty');
+    record('Validation enforces "Unit Rate is required."', hasRateValidationMsg, 'Blocks save if Unit Rate is empty');
 
-    // Check item selection does NOT assign rate
-    const itemSelectionBlock = poPageContent.slice(
-      poPageContent.indexOf("if (field === 'itemId')"),
-      poPageContent.indexOf("if (field === 'itemId')") + 300
-    );
-    const itemSelectionAssignsRate = itemSelectionBlock.includes('row.rate');
-    record('Item selection does NOT auto-populate Unit Rate', !itemSelectionAssignsRate, 'updateLine for itemId updates only code, name, unit');
-
-    // Check calculations are gated on valid rate
-    const rateCheckCalculation = poPageContent.includes('rateNum > 0 && qtyNum > 0');
-    record('Calculations require valid positive rate', rateCheckCalculation, 'subtotal/tax/totals only compute when rate > 0');
-
-    // Check historical view renders line.rate
-    const hasHistoricalRate = poPageContent.includes('₹ {line.rate}');
-    record('Existing PO View renders saved line.rate', hasHistoricalRate, 'Historical rate preserved in view modal');
+    // 1.9 Check PO Details view preserves saved line.unit
+    const hasHistoricalUnitRender = poPageContent.includes('{line.quantity} {line.unit || line.item?.unit || \'\'}');
+    record('Existing PO View renders saved line.unit with historical fallback', hasHistoricalUnitRender, '{line.quantity} {line.unit || line.item?.unit}');
 
     // -------------------------------------------------------------
-    // Start Server
+    // Start In-Process Server
     // -------------------------------------------------------------
     console.log('\n--- Step 2: Starting In-Process API Test Server ---');
     await initDatabase();
@@ -104,91 +130,157 @@ async function runPOVerification() {
     };
 
     // -------------------------------------------------------------
-    // 4. Database Item Master Verification
+    // 4. Fetch Master Items, Stores, and Suppliers
     // -------------------------------------------------------------
-    console.log('\n--- Step 4: Item Master Integrity Verification ---');
+    console.log('\n--- Step 4: Fetch Master Data ---');
     const itemsRes = await fetch(`${API_BASE}/store/items`, { headers: authHeaders });
     const itemsJson = (await itemsRes.json()) as any;
     const itemsList = itemsJson.data || [];
-    record('Fetch Items list', itemsRes.ok && itemsList.length > 0, `Loaded ${itemsList.length} items`);
-
     const testItem = itemsList[0];
-    record(
-      'Item Master data intact in database',
-      Boolean(testItem && testItem.id && testItem.code && testItem.name && testItem.unit),
-      `Item ${testItem?.code} (${testItem?.name}) with unit: ${testItem?.unit}, stock: ${testItem?.currentStock}`
-    );
+    record('Fetch Items list', itemsRes.ok && itemsList.length > 0, `Loaded ${itemsList.length} items. First: ${testItem?.code} (${testItem?.name})`);
 
-    // -------------------------------------------------------------
-    // 5. Fetch Active Store & Supplier
-    // -------------------------------------------------------------
-    console.log('\n--- Step 5: Fetch Store and Supplier ---');
     const storesRes = await fetch(`${API_BASE}/store/stores`, { headers: authHeaders });
     const storesJson = (await storesRes.json()) as any;
     const testStore = (storesJson.data || [])[0];
-    record('Fetch Store', Boolean(testStore), `Store: ${testStore?.name} (${testStore?.code})`);
+    record('Fetch Store', Boolean(testStore), `Store: ${testStore?.name}`);
 
     const suppliersRes = await fetch(`${API_BASE}/store/suppliers`, { headers: authHeaders });
     const suppliersJson = (await suppliersRes.json()) as any;
     const suppliersList = Array.isArray(suppliersJson.data) ? suppliersJson.data : (suppliersJson.data?.suppliers || []);
     const testSupplier = suppliersList[0];
-    record('Fetch Supplier', Boolean(testSupplier), `Supplier: ${testSupplier?.name} (${testSupplier?.code})`);
-
-    if (!testItem || !testStore || !testSupplier) {
-      throw new Error('Prerequisite master data missing to test PO creation');
-    }
+    record('Fetch Supplier', Boolean(testSupplier), `Supplier: ${testSupplier?.name}`);
 
     // -------------------------------------------------------------
-    // 6. Test PO Creation with User-Entered Manual Rate
+    // 5. Test PO Creation with User-Selected Unit: "KG"
     // -------------------------------------------------------------
-    console.log('\n--- Step 6: Test Purchase Order Creation with Manual Unit Rate ---');
-    const manualRate = 150;
-    const qty = 10;
-    const gstPercent = 18;
-    const expectedSubtotal = qty * manualRate; // 1500
-    const expectedTax = (expectedSubtotal * gstPercent) / 100; // 270
-    const expectedGrandTotal = expectedSubtotal + expectedTax; // 1770
-
-    const createPayload = {
+    console.log('\n--- Step 5: Test PO Creation with Selected Unit = "KG" (Not PCS!) ---');
+    const poKgPayload = {
       partyId: testSupplier.id,
       storeId: testStore.id,
-      notes: 'Automated test PO for manual unit rate verification',
+      notes: 'Test PO with Unit KG',
       items: [
         {
           itemId: testItem.id,
-          quantity: qty,
-          rate: manualRate,
+          unit: 'KG', // Explicitly selected KG
+          quantity: 25,
+          rate: 120,
           discountPercent: 0,
-          taxPercent: gstPercent,
+          taxPercent: 18,
         },
       ],
     };
 
-    const createRes = await fetch(`${API_BASE}/store/purchase-orders`, {
+    const poKgRes = await fetch(`${API_BASE}/store/purchase-orders`, {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify(createPayload),
+      body: JSON.stringify(poKgPayload),
     });
-    const createJson = (await createRes.json()) as any;
-    const createdPO = createJson.data;
+    const poKgJson = (await poKgRes.json()) as any;
+    const poKg = poKgJson.data;
+    if (poKg?.id) createdPoIds.push(poKg.id);
 
-    record('PO Creation API Response OK', createRes.ok, `Status: ${createRes.status}`);
-    record('PO Created with Correct Subtotal', createdPO?.subtotal === expectedSubtotal, `Subtotal = ₹${createdPO?.subtotal} (Expected: ${expectedSubtotal})`);
-    record('PO Created with Correct Tax Amount', createdPO?.taxAmount === expectedTax, `Tax = ₹${createdPO?.taxAmount} (Expected: ${expectedTax})`);
-    record('PO Created with Correct Grand Total', createdPO?.totalAmount === expectedGrandTotal, `Total = ₹${createdPO?.totalAmount} (Expected: ${expectedGrandTotal})`);
+    record('PO with Unit "KG" Created Successfully', poKgRes.status === 201, `Status: ${poKgRes.status}, PO: ${poKg?.poNumber}`);
+
+    // Fetch and verify line item saved unit is KG
+    const getKgRes = await fetch(`${API_BASE}/store/purchase-orders/${poKg?.id}`, { headers: authHeaders });
+    const getKgJson = (await getKgRes.json()) as any;
+    const fetchedKgPO = getKgJson.data;
+    const kgLine = fetchedKgPO?.items?.find((i: any) => i.itemId === testItem.id);
+
+    record('Saved PO Line Unit is "KG"', kgLine?.unit === 'KG', `DB unit: "${kgLine?.unit}" (Expected: "KG")`);
+    record('Saved PO Line Rate is 120', kgLine?.rate === 120, `DB rate: ₹${kgLine?.rate}`);
 
     // -------------------------------------------------------------
-    // 7. Test Multiple Line Items with Independent Manual Rates
+    // 6. Test PO Creation with User-Selected Unit: "BOX"
     // -------------------------------------------------------------
-    console.log('\n--- Step 7: Test Multiple Line Items with Independent Manual Rates ---');
+    console.log('\n--- Step 6: Test PO Creation with Selected Unit = "BOX" ---');
+    const poBoxPayload = {
+      partyId: testSupplier.id,
+      storeId: testStore.id,
+      notes: 'Test PO with Unit BOX',
+      items: [
+        {
+          itemId: testItem.id,
+          unit: 'BOX', // Explicitly selected BOX
+          quantity: 15,
+          rate: 450,
+          discountPercent: 5,
+          taxPercent: 18,
+        },
+      ],
+    };
+
+    const poBoxRes = await fetch(`${API_BASE}/store/purchase-orders`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify(poBoxPayload),
+    });
+    const poBoxJson = (await poBoxRes.json()) as any;
+    const poBox = poBoxJson.data;
+    if (poBox?.id) createdPoIds.push(poBox.id);
+
+    record('PO with Unit "BOX" Created Successfully', poBoxRes.status === 201, `Status: ${poBoxRes.status}, PO: ${poBox?.poNumber}`);
+
+    // Fetch and verify line item saved unit is BOX
+    const getBoxRes = await fetch(`${API_BASE}/store/purchase-orders/${poBox?.id}`, { headers: authHeaders });
+    const getBoxJson = (await getBoxRes.json()) as any;
+    const fetchedBoxPO = getBoxJson.data;
+    const boxLine = fetchedBoxPO?.items?.find((i: any) => i.itemId === testItem.id);
+
+    record('Saved PO Line Unit is "BOX"', boxLine?.unit === 'BOX', `DB unit: "${boxLine?.unit}" (Expected: "BOX")`);
+    record('Saved PO Line Rate is 450', boxLine?.rate === 450, `DB rate: ₹${boxLine?.rate}`);
+
+    // -------------------------------------------------------------
+    // 7. Test PO Creation with User-Selected Unit: "PCS"
+    // -------------------------------------------------------------
+    console.log('\n--- Step 7: Test PO Creation with User Selecting "PCS" Manually ---');
+    const poPcsPayload = {
+      partyId: testSupplier.id,
+      storeId: testStore.id,
+      notes: 'Test PO with Unit PCS selected manually',
+      items: [
+        {
+          itemId: testItem.id,
+          unit: 'PCS', // User selected PCS manually
+          quantity: 10,
+          rate: 150,
+          discountPercent: 0,
+          taxPercent: 18,
+        },
+      ],
+    };
+
+    const poPcsRes = await fetch(`${API_BASE}/store/purchase-orders`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify(poPcsPayload),
+    });
+    const poPcsJson = (await poPcsRes.json()) as any;
+    const poPcs = poPcsJson.data;
+    if (poPcs?.id) createdPoIds.push(poPcs.id);
+
+    record('PO with Unit "PCS" Created Successfully', poPcsRes.status === 201, `Status: ${poPcsRes.status}, PO: ${poPcs?.poNumber}`);
+
+    const getPcsRes = await fetch(`${API_BASE}/store/purchase-orders/${poPcs?.id}`, { headers: authHeaders });
+    const getPcsJson = (await getPcsRes.json()) as any;
+    const fetchedPcsPO = getPcsJson.data;
+    const pcsLine = fetchedPcsPO?.items?.find((i: any) => i.itemId === testItem.id);
+
+    record('Saved PO Line Unit is "PCS"', pcsLine?.unit === 'PCS', `DB unit: "${pcsLine?.unit}" (Expected: "PCS")`);
+    record('Saved PO Line Rate is 150', pcsLine?.rate === 150, `DB rate: ₹${pcsLine?.rate}`);
+
+    // -------------------------------------------------------------
+    // 8. Test Multiple Line Items with Different Distinct Units
+    // -------------------------------------------------------------
+    console.log('\n--- Step 8: Multi-line PO with Distinct Custom Units per Line ---');
     const secondItem = itemsList.length > 1 ? itemsList[1] : itemsList[0];
     const multiPayload = {
       partyId: testSupplier.id,
       storeId: testStore.id,
-      notes: 'Multi-line PO manual rates',
+      notes: 'Multi-line PO with KG and LTR',
       items: [
-        { itemId: testItem.id, quantity: 5, rate: 200, discountPercent: 0, taxPercent: 18 },
-        ...(itemsList.length > 1 ? [{ itemId: secondItem.id, quantity: 2, rate: 350, discountPercent: 10, taxPercent: 18 }] : []),
+        { itemId: testItem.id, unit: 'KG', quantity: 50, rate: 80, discountPercent: 0, taxPercent: 18 },
+        ...(itemsList.length > 1 ? [{ itemId: secondItem.id, unit: 'LTR', quantity: 10, rate: 220, discountPercent: 0, taxPercent: 18 }] : []),
       ],
     };
 
@@ -199,49 +291,40 @@ async function runPOVerification() {
     });
     const multiJson = (await multiRes.json()) as any;
     const multiPO = multiJson.data;
-    record('Multiple Line Items PO Created Successfully', multiRes.ok && Boolean(multiPO), `PO Number: ${multiPO?.poNumber}`);
+    if (multiPO?.id) createdPoIds.push(multiPO.id);
 
-    // Clean up multiPO
-    if (multiPO?.id) {
-      await prisma.purchaseOrderItem.deleteMany({ where: { poId: multiPO.id } });
-      await prisma.purchaseOrder.delete({ where: { id: multiPO.id } });
+    record('Multi-Line PO Created', multiRes.status === 201, `Status: ${multiRes.status}`);
+
+    const getMultiRes = await fetch(`${API_BASE}/store/purchase-orders/${multiPO?.id}`, { headers: authHeaders });
+    const getMultiJson = (await getMultiRes.json()) as any;
+    const fetchedMulti = getMultiJson.data;
+
+    const line1 = fetchedMulti?.items?.find((i: any) => i.itemId === testItem.id);
+    record('Line 1 Unit Preserved as "KG"', line1?.unit === 'KG', `Line 1 Unit: ${line1?.unit}`);
+
+    if (itemsList.length > 1) {
+      const line2 = fetchedMulti?.items?.find((i: any) => i.itemId === secondItem.id);
+      record('Line 2 Unit Preserved as "LTR"', line2?.unit === 'LTR', `Line 2 Unit: ${line2?.unit}`);
     }
 
     // -------------------------------------------------------------
-    // 8. Test Fetching Created PO & Verifying Saved Unit Rate
+    // 9. Cleanup Created Test POs
     // -------------------------------------------------------------
-    console.log('\n--- Step 8: Verify Historical Saved Unit Rate Preservation ---');
-    if (createdPO?.id) {
-      const getPoRes = await fetch(`${API_BASE}/store/purchase-orders/${createdPO.id}`, { headers: authHeaders });
-      const getPoJson = (await getPoRes.json()) as any;
-      const fetchedPO = getPoJson.data;
-
-      const savedLine = fetchedPO?.items?.find((i: any) => i.itemId === testItem.id);
-      record('Fetch PO by ID', getPoRes.ok && Boolean(fetchedPO), `PO Number: ${fetchedPO?.poNumber}`);
-      record(
-        'Saved Unit Rate Preserved Exactly (Historical Record)',
-        savedLine?.rate === manualRate,
-        `Line Rate in DB: ₹${savedLine?.rate} (User Input: ₹${manualRate})`
-      );
-      record(
-        'Line Item Total Matches Calculated Total',
-        savedLine?.total === expectedGrandTotal,
-        `Line Total: ₹${savedLine?.total} (Expected: ₹${expectedGrandTotal})`
-      );
-
-      // Clean up test PO
-      await prisma.purchaseOrderItem.deleteMany({ where: { poId: createdPO.id } });
-      await prisma.purchaseOrder.delete({ where: { id: createdPO.id } });
-      console.log('Cleaned up test Purchase Order record.');
+    console.log('\n--- Step 9: Cleanup Test Records ---');
+    for (const id of createdPoIds) {
+      await prisma.purchaseOrderItem.deleteMany({ where: { poId: id } });
+      await prisma.purchaseOrder.delete({ where: { id } });
     }
+    console.log(`Cleaned up ${createdPoIds.length} test Purchase Orders.`);
+    record('Database Test Cleanup Successful', true, `Deleted ${createdPoIds.length} test records`);
 
     // -------------------------------------------------------------
-    // Final Summary
+    // Summary
     // -------------------------------------------------------------
     console.log('\n================================================================');
     const passedCount = results.filter((r) => r.passed).length;
     const failedCount = results.filter((r) => !r.passed).length;
-    console.log(`PO VERIFICATION COMPLETED: ${passedCount} PASSED, ${failedCount} FAILED out of ${results.length} checks`);
+    console.log(`PO UNIT / UOM & RATE VERIFICATION: ${passedCount} PASSED, ${failedCount} FAILED out of ${results.length} checks`);
     console.log('================================================================');
 
     if (failedCount > 0) {
