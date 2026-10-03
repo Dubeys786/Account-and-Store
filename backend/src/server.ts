@@ -15,11 +15,11 @@ async function startServer() {
     await seedDatabase();
 
     // 3. Start Express HTTP Server
-    const server = app.listen(env.PORT, () => {
+    const server = app.listen(env.PORT, '0.0.0.0', () => {
       logger.info(`========================================================`);
-      logger.info(`  STOCKLEDGER Store & Accounts API running at: http://localhost:${env.PORT}`);
+      logger.info(`  STOCKLEDGER Store & Accounts API running on port: ${env.PORT}`);
       logger.info(`  Environment: ${env.NODE_ENV}`);
-      logger.info(`  Health Check: http://localhost:${env.PORT}/api/v1/health`);
+      logger.info(`  Health Check endpoint: /api/v1/health`);
       logger.info(`========================================================`);
     });
 
