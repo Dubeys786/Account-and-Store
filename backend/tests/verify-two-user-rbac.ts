@@ -248,6 +248,7 @@ async function runTwoUserRbacVerification() {
     process.exit(1);
   } finally {
     server.close();
+    process.exit(0);
   }
 }
 

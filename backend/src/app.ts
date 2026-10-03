@@ -28,6 +28,7 @@ app.use(
       if (
         allowedOrigins.includes(origin) ||
         env.NODE_ENV === 'development' ||
+        origin.endsWith('.netlify.app') ||
         origin.endsWith('.vercel.app') ||
         origin.includes('localhost') ||
         origin.includes('127.0.0.1')

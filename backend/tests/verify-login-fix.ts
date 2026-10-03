@@ -114,6 +114,20 @@ async function runLoginVerification() {
       `got ${allowOrigin}`
     );
 
+    const res7Netlify = await fetch(`${baseUrl}/api/v1/auth/login`, {
+      method: 'OPTIONS',
+      headers: {
+        'Origin': 'https://stockledger-frontend.netlify.app',
+        'Access-Control-Request-Method': 'POST',
+      },
+    });
+    const allowOriginNetlify = res7Netlify.headers.get('access-control-allow-origin');
+    assert(
+      allowOriginNetlify === 'https://stockledger-frontend.netlify.app',
+      'CORS allows Netlify deployed origin',
+      `got ${allowOriginNetlify}`
+    );
+
     console.log('\n===============================================================');
     console.log(`LOGIN FIX VERIFICATION SUMMARY: ${passed} PASSED, ${failed} FAILED`);
     console.log('===============================================================');

@@ -21,13 +21,24 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const cached = localStorage.getItem('stockledger_user') || localStorage.getItem('prozen_user');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
   const [token, setToken] = useState<string | null>(
     () => localStorage.getItem('stockledger_token') || localStorage.getItem('prozen_token')
   );
   const [stores, setStores] = useState<Store[]>(() => {
-    const cached = localStorage.getItem('stockledger_stores') || localStorage.getItem('prozen_stores');
-    return cached ? JSON.parse(cached) : [];
+    try {
+      const cached = localStorage.getItem('stockledger_stores') || localStorage.getItem('prozen_stores');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
   });
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -62,8 +73,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localStorage.setItem('stockledger_active_store_id', activeStoreId);
           }
           localStorage.removeItem('prozen_active_store_id');
-        } else {
-          // Token invalid
+        } else if (res.status === 401) {
+          // Token explicitly expired or invalid
           localStorage.removeItem('stockledger_token');
           localStorage.removeItem('stockledger_user');
           localStorage.removeItem('stockledger_stores');
@@ -73,6 +84,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setToken(null);
           setUser(null);
         }
+        // If other status (e.g. server temporarily unreachable or 502/503),
+        // keep cached user & token so refresh does not unnecessarily log the user out
       } catch {
         // Ignore network errors on init
       } finally {
@@ -139,8 +152,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: true, user: res.data.user };
       }
       return { success: false, message: res.message || 'Login failed.' };
-    } catch (err: any) {
-      return { success: false, message: err.message || 'Network error occurred.' };
+    } catch {
+      return { success: false, message: 'Unable to connect to the authentication server. Please try again.' };
     } finally {
       setIsLoading(false);
     }

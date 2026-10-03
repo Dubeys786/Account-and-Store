@@ -9,33 +9,39 @@ export function getApiBaseUrl(): string {
   // Support optional runtime global configuration
   const runtimeUrl = typeof window !== 'undefined' ? (window as any).__STOCKLEDGER_API_URL__ : undefined;
 
-  const rawEnvUrl =
-    runtimeUrl ||
-    (import.meta as any).env?.VITE_API_BASE_URL ||
-    (import.meta as any).env?.VITE_API_URL ||
-    '';
+  const isLocalHost =
+    typeof window !== 'undefined'
+      ? window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname === '[::1]'
+      : false;
 
-  if (rawEnvUrl && typeof rawEnvUrl === 'string') {
-    const cleaned = rawEnvUrl.trim().replace(/\/+$/, '');
-    if (cleaned) {
-      // In remote environments (e.g. Vercel deployment), do not use baked-in localhost/127.0.0.1
-      if (
-        typeof window !== 'undefined' &&
-        window.location.hostname !== 'localhost' &&
-        window.location.hostname !== '127.0.0.1' &&
-        (cleaned.includes('localhost') || cleaned.includes('127.0.0.1'))
-      ) {
-        return '/api/v1';
-      }
+  const viteApiUrl = (import.meta as any).env?.VITE_API_URL;
+  const viteApiBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
 
-      if (cleaned.endsWith('/api/v1') || cleaned.endsWith('/api')) {
-        return cleaned;
-      }
-      return `${cleaned}/api/v1`;
+  // Priority order: runtime URL > VITE_API_URL > VITE_API_BASE_URL
+  const candidates: (string | undefined)[] = [runtimeUrl, viteApiUrl, viteApiBaseUrl];
+
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'string') continue;
+    const trimmed = candidate.trim();
+    if (!trimmed) continue;
+
+    const isLocalTarget = trimmed.includes('localhost') || trimmed.includes('127.0.0.1');
+
+    // In remote production environments (e.g. Netlify), reject baked-in localhost targets
+    if (!isLocalHost && isLocalTarget) {
+      continue;
     }
+
+    const cleaned = trimmed.replace(/\/+$/, '');
+    if (cleaned.endsWith('/api/v1') || cleaned.endsWith('/api')) {
+      return cleaned;
+    }
+    return `${cleaned}/api/v1`;
   }
 
-  // Fallback for local Vite dev proxy or same-domain deployment
+  // Fallback for local Vite dev proxy or same-domain deployment with reverse proxy
   return '/api/v1';
 }
 
@@ -84,14 +90,15 @@ function formatErrorMessage(status: number, data: any, endpoint: string): string
       case 403:
         return 'You are not authorized to access this workspace.';
       case 404:
-        return 'Authentication endpoint was not found. Please check the API configuration.';
+        return 'Unable to connect to the authentication server. Please try again.';
       case 429:
         return 'Too many login attempts. Please wait a moment and try again.';
       case 500:
+        return 'Authentication server encountered an error.';
       case 502:
       case 503:
       case 504:
-        return 'Authentication server encountered an error.';
+        return 'Unable to connect to the authentication server. Please try again.';
       default:
         return data?.message && typeof data.message === 'string' && !data.message.includes('<!DOCTYPE')
           ? data.message
@@ -122,10 +129,11 @@ function formatErrorMessage(status: number, data: any, endpoint: string): string
     case 429:
       return 'Too many requests. Please wait a moment and try again.';
     case 500:
+      return 'Server encountered an error. Please try again later.';
     case 502:
     case 503:
     case 504:
-      return 'Server encountered an error. Please try again later.';
+      return 'Unable to connect to the server. Please try again.';
     default:
       return `Service error (${status}). Please try again later.`;
   }
@@ -134,7 +142,7 @@ function formatErrorMessage(status: number, data: any, endpoint: string): string
 export async function apiRequest<T = any>(
   endpoint: string,
   options: RequestInit = {}
-): Promise<{ success: boolean; data?: T; message?: string; error?: any; meta?: any; summary?: any; [key: string]: any }> {
+): Promise<{ success: boolean; status?: number; data?: T; message?: string; error?: any; meta?: any; summary?: any; [key: string]: any }> {
   const token = localStorage.getItem('stockledger_token') || localStorage.getItem('prozen_token');
   const activeStoreId = localStorage.getItem('stockledger_active_store_id') || localStorage.getItem('prozen_active_store_id');
 
@@ -173,19 +181,25 @@ export async function apiRequest<T = any>(
       }
       return {
         success: false,
+        status: response.status,
         message: formatErrorMessage(response.status, data, endpoint),
         error: data?.error,
       };
     }
 
-    return data || { success: true };
+    return {
+      success: true,
+      status: response.status,
+      ...(data || {}),
+    };
   } catch (error: any) {
     const isAuthRoute = endpoint.includes('/auth/');
     return {
       success: false,
+      status: 0,
       message: isAuthRoute
-        ? 'Unable to connect to the authentication service.'
-        : error.message || 'Network error occurred. Please check your server connection.',
+        ? 'Unable to connect to the authentication server. Please try again.'
+        : 'Unable to connect to the server. Please check your connection and try again.',
     };
   }
 }

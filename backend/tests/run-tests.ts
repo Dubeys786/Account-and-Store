@@ -1,11 +1,10 @@
 import { initDatabase, prisma } from '../src/config/db';
-import { AuthService } from '../src/modules/auth/auth.service';
-import { seedDatabase } from '../prisma/seed';
+import { seedDatabase } from '../src/config/seed';
 import app from '../src/app';
 import http from 'http';
 
 async function runTests() {
-  console.log('🧪 Starting PROZEN Backend Automated Test Suite...\n');
+  console.log('🧪 Starting STOCKLEDGER Backend Automated Test Suite...\n');
   let passed = 0;
   let failed = 0;
 
@@ -29,7 +28,7 @@ async function runTests() {
   const baseUrl = `http://localhost:${port}/api/v1`;
 
   try {
-    // TEST 1: Database Connection & Seeded Entities Count
+    // TEST 1: Database Connection & Seeded Infrastructure
     console.log('Test Suite 1: Database Connectivity & Models');
     const [users, stores, items, parties, accounts] = await Promise.all([
       prisma.user.findMany(),
@@ -39,10 +38,8 @@ async function runTests() {
       prisma.ledgerAccount.findMany(),
     ]);
 
-    assert(users.length >= 3, `Seeded users exist (found ${users.length})`);
-    assert(stores.length >= 2, `Seeded stores exist (found ${stores.length})`);
-    assert(items.length >= 3, `Seeded items exist (found ${items.length})`);
-    assert(parties.length >= 3, `Seeded parties exist (found ${parties.length})`);
+    assert(users.length >= 2, `Seeded system users exist (found ${users.length})`);
+    assert(stores.length >= 2, `Physical stores exist (found ${stores.length})`);
     assert(accounts.length >= 10, `Chart of accounts seeded (found ${accounts.length})`);
 
     // TEST 2: Health Endpoint Check
@@ -53,107 +50,99 @@ async function runTests() {
     assert(healthJson.data?.status === 'healthy', 'Health status is healthy');
     assert(healthJson.data?.database?.status === 'connected', 'Database status is connected');
 
-    // TEST 3: Authentication & Password Verification
+    // TEST 3: Authentication & Password Verification (Sakshi & Akhilesh)
     console.log('\nTest Suite 3: Authentication & Credentials');
-    const adminLoginRes = await fetch(`${baseUrl}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@prozen.com', password: 'Prozen@123' }),
-    });
-    const adminLogin = (await adminLoginRes.json()) as any;
-    assert(adminLoginRes.status === 200, 'Admin login succeeds with HTTP 200');
-    assert(adminLogin.data?.user?.role === 'ADMIN', 'Admin user receives ADMIN role');
-    assert(typeof adminLogin.data?.token === 'string', 'Admin receives valid JWT token');
+    const testPassword = process.env.INITIAL_USER_PASSWORD || 'Stockledger@123';
 
-    const storeLoginRes = await fetch(`${baseUrl}/auth/login`, {
+    const sakshiLoginRes = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'store@prozen.com', password: 'Prozen@123' }),
+      body: JSON.stringify({ email: 'dubeysakshi618@gmail.com', password: testPassword }),
     });
-    const storeLogin = (await storeLoginRes.json()) as any;
-    assert(storeLoginRes.status === 200, 'Store user login succeeds');
-    assert(storeLogin.data?.user?.role === 'STORE_USER', 'Store user receives STORE_USER role');
+    const sakshiLogin = (await sakshiLoginRes.json()) as any;
+    assert(sakshiLoginRes.status === 200, 'Sakshi login succeeds with HTTP 200');
+    assert(sakshiLogin.data?.user?.jobTitle === 'Store Incharge', 'Sakshi receives Store Incharge jobTitle');
+    assert(sakshiLogin.data?.user?.accessibleWorkspaces?.store === true, 'Sakshi receives store workspace access');
+    assert(typeof sakshiLogin.data?.token === 'string', 'Sakshi receives valid JWT token');
 
-    const accountLoginRes = await fetch(`${baseUrl}/auth/login`, {
+    const akhileshLoginRes = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'account@prozen.com', password: 'Prozen@123' }),
+      body: JSON.stringify({ email: 'dubeyakhilesh2005@gmail.com', password: testPassword }),
     });
-    const accountLogin = (await accountLoginRes.json()) as any;
-    assert(accountLoginRes.status === 200, 'Account user login succeeds');
-    assert(accountLogin.data?.user?.role === 'ACCOUNT_USER', 'Account user receives ACCOUNT_USER role');
+    const akhileshLogin = (await akhileshLoginRes.json()) as any;
+    assert(akhileshLoginRes.status === 200, 'Akhilesh login succeeds with HTTP 200');
+    assert(akhileshLogin.data?.user?.jobTitle === 'Account & Store Incharge', 'Akhilesh receives Account & Store Incharge jobTitle');
+    assert(akhileshLogin.data?.user?.accessibleWorkspaces?.accounts === true, 'Akhilesh receives accounts workspace access');
+    assert(akhileshLogin.data?.user?.accessibleWorkspaces?.store === true, 'Akhilesh receives store workspace access');
 
     const badLoginRes = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@prozen.com', password: 'WrongPassword' }),
+      body: JSON.stringify({ email: 'dubeysakshi618@gmail.com', password: 'WrongPassword' }),
     });
     assert(badLoginRes.status === 401, 'Bad password rejected with HTTP 401');
 
     // TEST 4: Role-Based Authorization Enforcement
     console.log('\nTest Suite 4: Role-Based Authorization Enforcement');
-    const storeToken = storeLogin.data?.token;
-    const accountToken = accountLogin.data?.token;
-    const adminToken = adminLogin.data?.token;
+    const sakshiToken = sakshiLogin.data?.token;
+    const akhileshToken = akhileshLogin.data?.token;
 
-    // STORE_USER trying to access Accounts module -> MUST BE FORBIDDEN (403)
-    const storeToAccountsRes = await fetch(`${baseUrl}/accounts/dashboard-metrics`, {
-      headers: { Authorization: `Bearer ${storeToken}` },
+    // Sakshi (Store Incharge) trying to access Accounts module -> MUST BE FORBIDDEN (403)
+    const sakshiToAccountsRes = await fetch(`${baseUrl}/accounts/dashboard-metrics`, {
+      headers: { Authorization: `Bearer ${sakshiToken}` },
     });
     assert(
-      storeToAccountsRes.status === 403,
-      'STORE_USER accessing Accounts module is blocked with HTTP 403 Forbidden'
+      sakshiToAccountsRes.status === 403,
+      'Store Incharge accessing Accounts module is blocked with HTTP 403 Forbidden'
     );
 
-    // ACCOUNT_USER trying to access Accounts module -> MUST SUCCEED (200)
-    const accountToAccountsRes = await fetch(`${baseUrl}/accounts/dashboard-metrics`, {
-      headers: { Authorization: `Bearer ${accountToken}` },
+    // Akhilesh (Account & Store Incharge) accessing Accounts module -> MUST SUCCEED (200)
+    const akhileshToAccountsRes = await fetch(`${baseUrl}/accounts/dashboard-metrics`, {
+      headers: { Authorization: `Bearer ${akhileshToken}` },
     });
     assert(
-      accountToAccountsRes.status === 200,
-      'ACCOUNT_USER accessing Accounts module is granted with HTTP 200 OK'
+      akhileshToAccountsRes.status === 200,
+      'Account & Store Incharge accessing Accounts module is granted with HTTP 200 OK'
     );
 
-    // ACCOUNT_USER trying to access Store module -> MUST BE FORBIDDEN (403)
-    const accountToStoreRes = await fetch(`${baseUrl}/store/items`, {
-      headers: { Authorization: `Bearer ${accountToken}` },
+    // Sakshi accessing Store module -> MUST SUCCEED (200)
+    const sakshiToStoreRes = await fetch(`${baseUrl}/store/items`, {
+      headers: { Authorization: `Bearer ${sakshiToken}` },
     });
     assert(
-      accountToStoreRes.status === 403,
-      'ACCOUNT_USER accessing Store module is blocked with HTTP 403 Forbidden'
+      sakshiToStoreRes.status === 200,
+      'Store Incharge accessing Store module is granted with HTTP 200 OK'
     );
 
-    // STORE_USER trying to access Store module -> MUST SUCCEED (200)
-    const storeToStoreRes = await fetch(`${baseUrl}/store/items`, {
-      headers: { Authorization: `Bearer ${storeToken}` },
+    // Akhilesh accessing Store module -> MUST SUCCEED (200) (Retains full store access)
+    const akhileshToStoreRes = await fetch(`${baseUrl}/store/items`, {
+      headers: { Authorization: `Bearer ${akhileshToken}` },
     });
     assert(
-      storeToStoreRes.status === 200,
-      'STORE_USER accessing Store module is granted with HTTP 200 OK'
-    );
-
-    // In two-user system, ADMIN role is decommissioned and blocked from store/accounts modules
-    const adminToStoreRes = await fetch(`${baseUrl}/store/items`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
-    });
-    const adminToAccountsRes = await fetch(`${baseUrl}/accounts/dashboard-metrics`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
-    });
-    assert(
-      adminToStoreRes.status === 403 && adminToAccountsRes.status === 403,
-      'ADMIN is blocked from Store and Accounts modules (Admin system removed)'
+      akhileshToStoreRes.status === 200,
+      'Account & Store Incharge accessing Store module is granted with HTTP 200 OK (retains store access)'
     );
 
     // TEST 5: Purchase Accounts Workflow Architecture (WITH PO vs WITHOUT PO)
     console.log('\nTest Suite 5: Purchase Workflow Rules (WITH PO vs WITHOUT PO)');
     const purchaseWithPoRes = await fetch(`${baseUrl}/accounts/purchases?type=with-po`, {
-      headers: { Authorization: `Bearer ${accountToken}` },
+      headers: { Authorization: `Bearer ${akhileshToken}` },
     });
     const purchaseWithoutPoRes = await fetch(`${baseUrl}/accounts/purchases?type=without-po`, {
-      headers: { Authorization: `Bearer ${accountToken}` },
+      headers: { Authorization: `Bearer ${akhileshToken}` },
     });
     assert(purchaseWithPoRes.status === 200, 'WITH PO filter API endpoint functions correctly');
     assert(purchaseWithoutPoRes.status === 200, 'WITHOUT PO filter API endpoint functions correctly');
+
+    // TEST 6: Session Persistence via /auth/me
+    console.log('\nTest Suite 6: Session Persistence');
+    const meRes = await fetch(`${baseUrl}/auth/me`, {
+      headers: { Authorization: `Bearer ${sakshiToken}` },
+    });
+    const meJson = (await meRes.json()) as any;
+    assert(meRes.status === 200, 'GET /api/v1/auth/me succeeds with HTTP 200');
+    assert(meJson.data?.user?.email === 'dubeysakshi618@gmail.com', 'Restores correct user session');
 
     console.log('\n----------------------------------------');
     console.log(`Test Summary: ${passed} Passed, ${failed} Failed`);
@@ -165,6 +154,7 @@ async function runTests() {
   } finally {
     server.close();
     await prisma.$disconnect();
+    process.exit(0);
   }
 }
 
