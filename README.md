@@ -180,7 +180,7 @@ Account-and-Store/
 │   │   └── seed.ts                     # Database seeder
 │   ├── src/
 │   │   ├── config/
-│   │   │   ├── db.ts                   # Resilient PostgreSQL / embedded PGlite connector
+│   │   │   ├── db.ts                   # Resilient native PostgreSQL connector via DATABASE_URL
 │   │   │   ├── env.ts                  # Typed environment configuration
 │   │   │   └── seed.ts                 # Seeder implementation
 │   │   ├── middleware/

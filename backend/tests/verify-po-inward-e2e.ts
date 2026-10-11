@@ -196,7 +196,7 @@ async function runEndToEndVerification() {
     const fetchPoJson = (await fetchPoRes.json()) as any;
     const dbPO = fetchPoJson.data;
 
-    record('Database: PO record retrieved from PostgreSQL/PGlite', fetchPoRes.status === 200 && Boolean(dbPO), `PO ID: ${dbPO?.id}`);
+    record('Database: PO record retrieved from PostgreSQL', fetchPoRes.status === 200 && Boolean(dbPO), `PO ID: ${dbPO?.id}`);
     record('Database: PO Status = APPROVED in database', dbPO?.status === 'APPROVED');
     record('Database: Subtotal stored accurately', Number(dbPO?.subtotal) === 1000.00, `₹${dbPO?.subtotal}`);
     record('Database: Discount stored accurately', Number(dbPO?.discount) === 50.00, `₹${dbPO?.discount}`);

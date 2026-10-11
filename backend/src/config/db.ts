@@ -1,124 +1,26 @@
 import { PrismaClient } from '@prisma/client';
 import path from 'path';
 import fs from 'fs';
-import net from 'net';
 import env from './env';
 
-// Determine whether to use native PostgreSQL (Production) vs local embedded PGlite (Development/Test)
 export const isProduction = env.NODE_ENV === 'production';
-export const usePgLite = !isProduction && process.env.USE_PGLITE !== 'false';
-
-// Data directory for embedded PostgreSQL persistence in local development
-const dataDir = path.resolve(__dirname, '../../prisma/pgdata');
 
 declare global {
-  // eslint-disable-next-line no-var
-  var pgliteInstance: any | undefined;
   // eslint-disable-next-line no-var
   var prismaInstance: PrismaClient | undefined;
 }
 
-function initPGliteInstance(): any {
-  if (global.pgliteInstance) return global.pgliteInstance;
-
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-
-  // Clean stale lock
-  const pidPath = path.join(dataDir, 'postmaster.pid');
-  if (fs.existsSync(pidPath)) {
-    try {
-      fs.unlinkSync(pidPath);
-    } catch {}
-  }
-
-  // Lazy-load PGlite so it is NEVER loaded into memory in production
-  const { PGlite } = require('@electric-sql/pglite');
-
-  try {
-    return new PGlite(dataDir);
-  } catch (err: any) {
-    console.warn('⚠️ PGlite startup issue detected:', err.message || err);
-    console.log('🔄 Re-initializing fresh storage engine directory...');
-    const bakDir = path.resolve(__dirname, `../../prisma/pgdata_corrupt_${Date.now()}`);
-    try {
-      fs.renameSync(dataDir, bakDir);
-    } catch {
-      try {
-        fs.rmSync(dataDir, { recursive: true, force: true });
-      } catch {}
-    }
-    fs.mkdirSync(dataDir, { recursive: true });
-    return new PGlite(dataDir);
-  }
-}
-
-export let pglite: any = undefined;
-export let pgliteAdapter: any = undefined;
-
-let prismaClient: PrismaClient;
-
-if (usePgLite) {
-  pglite = initPGliteInstance();
-  const { PrismaPGlite } = require('pglite-prisma-adapter');
-  pgliteAdapter = new PrismaPGlite(pglite);
-
-  prismaClient =
-    global.prismaInstance ||
-    new PrismaClient({
-      adapter: pgliteAdapter as any,
-      log: env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
-    });
-
-  global.pgliteInstance = pglite;
-  global.prismaInstance = prismaClient;
-} else {
-  // In production, connect directly via native PostgreSQL using DATABASE_URL
-  // Zero WebAssembly memory overhead, stays well under 512MB RAM
-  prismaClient =
-    global.prismaInstance ||
-    new PrismaClient({
-      log: env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
-    });
-
-  if (env.NODE_ENV !== 'production') {
-    global.prismaInstance = prismaClient;
-  }
-}
-
-export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
-  get(_target, prop) {
-    return (prismaClient as any)[prop];
-  },
-});
-
-/**
- * Check if the host and port in DATABASE_URL are listening
- */
-export function checkTcpPort(host: string, port: number, timeoutMs = 1500): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-
-    socket.setTimeout(timeoutMs);
-    socket.once('connect', () => {
-      socket.destroy();
-      resolve(true);
-    });
-
-    socket.once('timeout', () => {
-      socket.destroy();
-      resolve(false);
-    });
-
-    socket.once('error', () => {
-      socket.destroy();
-      resolve(false);
-    });
-
-    socket.connect(port, host);
+const prismaClient: PrismaClient =
+  global.prismaInstance ||
+  new PrismaClient({
+    log: env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   });
+
+if (env.NODE_ENV !== 'production') {
+  global.prismaInstance = prismaClient;
 }
+
+export const prisma: PrismaClient = prismaClient;
 
 function splitSqlStatements(sql: string): string[] {
   const cleanSql = sql.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -140,31 +42,22 @@ function splitSqlStatements(sql: string): string[] {
 }
 
 async function queryCount(sql: string): Promise<number> {
-  if (usePgLite && pglite) {
-    const res: any = await pglite.query(sql);
-    return parseInt(res?.rows?.[0]?.count || '0', 10);
-  } else {
-    const res: any = await prismaClient.$queryRawUnsafe(sql);
-    const countVal = res?.[0]?.count ?? res?.[0]?.['count(*)'] ?? 0;
-    return parseInt(countVal.toString(), 10);
-  }
+  const res: any = await prismaClient.$queryRawUnsafe(sql);
+  const countVal = res?.[0]?.count ?? res?.[0]?.['count(*)'] ?? 0;
+  return parseInt(countVal.toString(), 10);
 }
 
 async function executeSql(sql: string): Promise<void> {
-  if (usePgLite && pglite) {
-    await pglite.exec(sql);
-  } else {
-    const statements = splitSqlStatements(sql);
-    for (const stmt of statements) {
-      try {
-        await prismaClient.$executeRawUnsafe(stmt);
-      } catch (err: any) {
-        const msg = (err.message || '').toLowerCase();
-        if (msg.includes('already exists') || msg.includes('duplicate')) {
-          // Benign idempotent DDL notices
-        } else {
-          console.warn('⚠️ Schema DDL notice on statement:', stmt.slice(0, 60), '->', err.message || err);
-        }
+  const statements = splitSqlStatements(sql);
+  for (const stmt of statements) {
+    try {
+      await prismaClient.$executeRawUnsafe(stmt);
+    } catch (err: any) {
+      const msg = (err.message || '').toLowerCase();
+      if (msg.includes('already exists') || msg.includes('duplicate')) {
+        // Benign idempotent DDL notices
+      } else {
+        console.warn('⚠️ Schema DDL notice on statement:', stmt.slice(0, 60), '->', err.message || err);
       }
     }
   }
@@ -181,44 +74,9 @@ export async function initDatabase(): Promise<void> {
   }
 
   try {
-    if (usePgLite) {
-      console.log('📦 Using embedded PGlite storage engine (development/test mode)...');
-      if (!pglite) {
-        pglite = initPGliteInstance();
-        const { PrismaPGlite } = require('pglite-prisma-adapter');
-        pgliteAdapter = new PrismaPGlite(pglite);
-        global.pgliteInstance = pglite;
-      }
-
-      try {
-        await pglite.waitReady;
-      } catch (e: any) {
-        console.warn('⚠️ PGlite storage corruption detected, restoring fresh storage engine...');
-        const bakDir = path.resolve(__dirname, `../../prisma/pgdata_corrupt_${Date.now()}`);
-        try {
-          fs.renameSync(dataDir, bakDir);
-        } catch {
-          try {
-            fs.rmSync(dataDir, { recursive: true, force: true });
-          } catch {}
-        }
-        fs.mkdirSync(dataDir, { recursive: true });
-        pglite = new (require('@electric-sql/pglite').PGlite)(dataDir);
-        await pglite.waitReady;
-        const { PrismaPGlite } = require('pglite-prisma-adapter');
-        pgliteAdapter = new PrismaPGlite(pglite);
-        prismaClient = new PrismaClient({
-          adapter: pgliteAdapter as any,
-          log: env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
-        });
-        global.pgliteInstance = pglite;
-        global.prismaInstance = prismaClient;
-      }
-    } else {
-      console.log('🔌 Initializing native PostgreSQL connection pool via DATABASE_URL...');
-      await prismaClient.$connect();
-      console.log('✅ Connected to PostgreSQL database successfully.');
-    }
+    console.log('🔌 Initializing native PostgreSQL connection pool via DATABASE_URL...');
+    await prismaClient.$connect();
+    console.log('✅ Connected to PostgreSQL database successfully.');
 
     console.log('🔍 Checking database connectivity and schema...');
 
